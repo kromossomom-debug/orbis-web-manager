@@ -33,6 +33,7 @@ const translations = {
 
     topbar_connect_mobile: "Conectar Celular",
     topbar_quick_upload: "Upload Rápido",
+    topbar_tutorial: "Tutorial",
 
     title_dashboard: "Dashboard",
     sub_dashboard: "Central de Controle do PlayStation 4",
@@ -131,6 +132,7 @@ const translations = {
 
     topbar_connect_mobile: "Connect Phone",
     topbar_quick_upload: "Quick Upload",
+    topbar_tutorial: "Tutorial",
 
     title_dashboard: "Dashboard",
     sub_dashboard: "PlayStation 4 Central Command",
@@ -267,6 +269,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Status polling interval (every 10s)
   setInterval(fetchStatus, 10000);
+
+  // Auto-launch interactive onboarding tutorial on first visit
+  if (!localStorage.getItem('owm_tour_completed')) {
+    setTimeout(startTour, 1200);
+  }
 });
 
 // ================= NAVIGATION =================
@@ -407,6 +414,26 @@ function initNavigation() {
       showToast(nextLang === 'en' ? 'Language switched to English!' : 'Idioma alterado para Português!', 'info');
     });
   }
+
+  // Tutorial / Tour Button & Controls
+  const btnTour = document.getElementById('btn-tour-start');
+  if (btnTour) {
+    btnTour.addEventListener('click', () => {
+      startTour();
+    });
+  }
+
+  const tourCloseBtn = document.getElementById('tour-close-btn');
+  if (tourCloseBtn) tourCloseBtn.addEventListener('click', closeTour);
+
+  const tourBackdrop = document.getElementById('tour-backdrop');
+  if (tourBackdrop) tourBackdrop.addEventListener('click', closeTour);
+
+  const tourPrevBtn = document.getElementById('tour-prev-btn');
+  if (tourPrevBtn) tourPrevBtn.addEventListener('click', () => showTourStep(currentTourStep - 1));
+
+  const tourNextBtn = document.getElementById('tour-next-btn');
+  if (tourNextBtn) tourNextBtn.addEventListener('click', () => showTourStep(currentTourStep + 1));
 }
 
 function updateTabTitles(tabId) {
@@ -1211,4 +1238,183 @@ function formatBytes(bytes, decimals = 1) {
   const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
   return `${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} ${sizes[i]}`;
+}
+
+// ================= INTERACTIVE TUTORIAL TOUR =================
+const tourSteps = [
+  {
+    target: '[data-tab="settings"]',
+    pt: {
+      title: "1. Conecte seu PlayStation 4",
+      desc: "O primeiro passo é abrir Configurações e colocar o endereço de IP do seu PS4 (ex: 192.168.18.54). O console e o computador/celular devem estar na mesma rede local."
+    },
+    en: {
+      title: "1. Connect your PlayStation 4",
+      desc: "The first step is to open Settings and enter your PS4's local IP address (e.g. 192.168.18.54). Both console and device must be on the same local network."
+    }
+  },
+  {
+    target: '#pane-dashboard .stat-card:first-child',
+    switchTab: 'dashboard',
+    pt: {
+      title: "2. Status do Console & Rede",
+      desc: "Acompanhe aqui em tempo real a latência (ping), o status do servidor FTP (2121) do GoldHEN e a porta de injeção de Payloads (9090)."
+    },
+    en: {
+      title: "2. Console Status & Network",
+      desc: "Check real-time connectivity, latency in milliseconds, and status for GoldHEN FTP (2121) and BinLoader (9090) ports."
+    }
+  },
+  {
+    target: '[data-tab="games"]',
+    pt: {
+      title: "3. Jogos, Horas & Troca de Capas",
+      desc: "Veja toda sua biblioteca instalada, tempo jogado e altere a capa de qualquer jogo enviando uma imagem nova direto pelo navegador!"
+    },
+    en: {
+      title: "3. Games, Playtime & Covers",
+      desc: "Browse installed games, track playtime records, and change game covers on your PS4 by uploading images directly here!"
+    }
+  },
+  {
+    target: '[data-tab="cheats"]',
+    pt: {
+      title: "4. Cheats & Conversor CUSA",
+      desc: "Gerencie cheats do GoldHEN e use o Conversor CUSA para transformar cheats de outras regiões (como CUSA00242) para a versão instalada no seu console."
+    },
+    en: {
+      title: "4. Cheats & CUSA Converter",
+      desc: "Manage GoldHEN cheats and use the CUSA Converter to adapt cheats from foreign regions (like CUSA00242) into your installed game version."
+    }
+  },
+  {
+    target: '#btn-qr-mobile',
+    pt: {
+      title: "5. Acesso pelo Smartphone",
+      desc: "Clique no botão 'Conectar Celular' para gerar um QR Code instantâneo e controlar seu PlayStation 4 diretamente pelo smartphone."
+    },
+    en: {
+      title: "5. Smartphone Access",
+      desc: "Click 'Connect Phone' to display an instant QR code and control your PlayStation 4 directly from your smartphone."
+    }
+  },
+  {
+    target: '[data-tab="donate"]',
+    pt: {
+      title: "6. Apoie o Projeto ❤️",
+      desc: "Gostou do Orbis Web Manager? Na aba Apoiar Projeto você pode contribuir com o desenvolvedor via Pix QR Code ou Buy Me a Coffee!"
+    },
+    en: {
+      title: "6. Support the Project ❤️",
+      desc: "Enjoying Orbis Web Manager? Visit the Support tab to contribute to continuous open-source development via Pix QR code or Buy Me a Coffee!"
+    }
+  }
+];
+
+let currentTourStep = 0;
+
+function startTour() {
+  currentTourStep = 0;
+  showTourStep(0);
+}
+
+function closeTour() {
+  const backdrop = document.getElementById('tour-backdrop');
+  const balloon = document.getElementById('tour-balloon');
+  if (backdrop) backdrop.classList.remove('active');
+  if (balloon) balloon.classList.remove('active');
+  document.querySelectorAll('.tour-highlight').forEach(el => el.classList.remove('tour-highlight'));
+  localStorage.setItem('owm_tour_completed', 'true');
+}
+
+function showTourStep(index) {
+  if (index < 0 || index >= tourSteps.length) {
+    closeTour();
+    return;
+  }
+
+  currentTourStep = index;
+  const step = tourSteps[index];
+  const lang = state.lang || 'pt';
+  const content = step[lang] || step.pt;
+
+  if (step.switchTab && state.currentTab !== step.switchTab) {
+    switchTab(step.switchTab);
+  }
+
+  // Clear previous highlight
+  document.querySelectorAll('.tour-highlight').forEach(el => el.classList.remove('tour-highlight'));
+
+  const targetEl = document.querySelector(step.target);
+  if (targetEl) {
+    targetEl.classList.add('tour-highlight');
+    try {
+      targetEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    } catch { }
+  }
+
+  const backdrop = document.getElementById('tour-backdrop');
+  const balloon = document.getElementById('tour-balloon');
+  const badge = document.getElementById('tour-step-badge');
+  const title = document.getElementById('tour-title');
+  const desc = document.getElementById('tour-desc');
+  const prevBtn = document.getElementById('tour-prev-btn');
+  const nextBtn = document.getElementById('tour-next-btn');
+  const dots = document.getElementById('tour-dots');
+
+  if (backdrop) backdrop.classList.add('active');
+  if (balloon) balloon.classList.add('active');
+
+  badge.textContent = `${index + 1} / ${tourSteps.length}`;
+  title.textContent = content.title;
+  desc.textContent = content.desc;
+
+  prevBtn.style.display = index === 0 ? 'none' : 'inline-block';
+  prevBtn.textContent = lang === 'en' ? 'Previous' : 'Anterior';
+  nextBtn.textContent = (index === tourSteps.length - 1) ? (lang === 'en' ? 'Finish' : 'Concluir') : (lang === 'en' ? 'Next' : 'Próximo');
+
+  // Dots
+  dots.innerHTML = '';
+  tourSteps.forEach((_, i) => {
+    const dot = document.createElement('span');
+    dot.className = `tour-dot ${i === index ? 'active' : ''}`;
+    dots.appendChild(dot);
+  });
+
+  // Position balloon
+  positionBalloon(targetEl, balloon);
+}
+
+function positionBalloon(targetEl, balloon) {
+  if (!balloon) return;
+  const balloonWidth = 320;
+  const balloonHeight = balloon.offsetHeight || 200;
+  const pad = 14;
+
+  if (!targetEl) {
+    balloon.style.top = `${window.innerHeight / 2 - balloonHeight / 2}px`;
+    balloon.style.left = `${window.innerWidth / 2 - balloonWidth / 2}px`;
+    return;
+  }
+
+  const rect = targetEl.getBoundingClientRect();
+  let top = rect.bottom + pad;
+  let left = rect.left;
+
+  // Horizontal bounding
+  if (left + balloonWidth > window.innerWidth - 16) {
+    left = window.innerWidth - balloonWidth - 16;
+  }
+  if (left < 16) left = 16;
+
+  // Vertical bounding
+  if (top + balloonHeight > window.innerHeight - 16) {
+    top = rect.top - balloonHeight - pad;
+    if (top < 16) {
+      top = window.innerHeight / 2 - balloonHeight / 2;
+    }
+  }
+
+  balloon.style.top = `${Math.max(16, top)}px`;
+  balloon.style.left = `${Math.max(16, left)}px`;
 }

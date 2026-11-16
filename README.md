@@ -65,7 +65,10 @@ Ele se conecta diretamente ao seu **PlayStation 4** através da rede local (Wi-F
 * Interface 100% responsiva com **Bottom Navigation Bar** tátil no estilo app nativo.
 * **QR Code Integrado:** Basta apontar a câmera do celular para abrir o painel na hora via Wi-Fi.
 
-### 12. 💉 Injeção de Payloads
+### 12. 💡 Tour Interativo (Tutorial Integrado)
+* Balões guiados passo a passo que ensinam o usuário desde a conexão inicial de IP do PS4 até o uso de cheats, capas e backups.
+
+### 13. 💉 Injeção de Payloads
 * Envie arquivos `.bin` diretamente para a porta `9090` do GoldHEN sem precisar de programas externos.
 
 ---

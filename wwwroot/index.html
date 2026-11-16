@@ -102,6 +102,10 @@
             <span class="ping-wave"></span>
             <span class="ping-val">-- ms</span>
           </div>
+          <button class="btn btn-outline" id="btn-tour-start" title="Guia Interativo / Interactive Tour" style="display: flex; align-items: center; gap: 6px;">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3m0 4h.01"/></svg>
+            <span class="hide-mobile" data-i18n="topbar_tutorial">Tutorial</span>
+          </button>
           <button class="btn btn-outline" id="btn-lang-toggle" title="Alterar Idioma / Switch Language" style="display: flex; align-items: center; gap: 6px;">
             <span id="lang-flag">🇺🇸</span>
             <span id="lang-code" style="font-weight: 700;">EN</span>
@@ -744,6 +748,22 @@
 
   <!-- TOAST CONTAINER -->
   <div class="toast-container" id="toast-container"></div>
+
+  <!-- INTERACTIVE TUTORIAL OVERLAY & BALLOON -->
+  <div class="tour-backdrop" id="tour-backdrop"></div>
+  <div class="tour-balloon" id="tour-balloon">
+    <div class="tour-header">
+      <div class="tour-step-badge" id="tour-step-badge">1 / 6</div>
+      <button class="tour-close-btn" id="tour-close-btn" title="Pular Tutorial">&times;</button>
+    </div>
+    <h4 class="tour-title" id="tour-title">1. Conecte seu PlayStation 4</h4>
+    <p class="tour-desc" id="tour-desc">O primeiro passo é abrir a aba Configurações e colocar o endereço de IP do seu PS4 na rede.</p>
+    <div class="tour-footer">
+      <button class="btn btn-sm btn-outline" id="tour-prev-btn">Anterior</button>
+      <div class="tour-dots" id="tour-dots"></div>
+      <button class="btn btn-sm btn-primary" id="tour-next-btn">Próximo</button>
+    </div>
+  </div>
 
   <script src="/js/app.js"></script>
 </body>
