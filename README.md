@@ -81,9 +81,16 @@ O **Orbis Web Manager** é mantido e desenvolvido como software livre para a com
   *(Você também pode escanear o QR Code interativo direto na aba "Apoiar Projeto" dentro do próprio aplicativo!)*
 
 * **🌍 Buy Me a Coffee (Apoio Internacional):**
-  [![Buy Me A Coffee](https://img.shields.io/badge/Buy%20Me%20A%20Coffee-Apoiar-orange?style=for-the-badge&logo=buy-me-a-coffee)](https://buymeacoffee.com/)
+  [![Buy Me A Coffee](https://img.shields.io/badge/Buy%20Me%20A%20Coffee-kromossomoc-orange?style=for-the-badge&logo=buy-me-a-coffee)](https://buymeacoffee.com/kromossomoc)
+
+  🔗 Link direto: [buymeacoffee.com/kromossomoc](https://buymeacoffee.com/kromossomoc)
 
 ---
+
+## 🌐 Idiomas / Multilingual Support
+O aplicativo conta com suporte bilíngue nativo com troca instantânea no cabeçalho:
+* 🇧🇷 **Português (Brasil)**
+* 🇺🇸 **English (US)**
 
 ## 🚀 Como Iniciar
 

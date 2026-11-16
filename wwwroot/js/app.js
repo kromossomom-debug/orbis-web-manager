@@ -14,11 +14,247 @@ const state = {
   selectedCaptureGame: '',
   selectedGameIdForCover: null,
   status: null,
-  localIps: []
+  localIps: [],
+  lang: localStorage.getItem('owm_lang') || 'pt'
 };
+
+// ================= I18N (INTERNATIONALIZATION) =================
+const translations = {
+  pt: {
+    nav_dashboard: "Dashboard",
+    nav_games: "Jogos & Apps",
+    nav_files: "Arquivos (FTP)",
+    nav_cheats: "Cheats & Mods",
+    nav_pkgs: "Pacotes (PKG)",
+    nav_media: "Capturas & Prints",
+    nav_tools: "Payloads & Ações",
+    nav_settings: "Configurações",
+    nav_donate: "Apoiar Projeto",
+
+    topbar_connect_mobile: "Conectar Celular",
+    topbar_quick_upload: "Upload Rápido",
+
+    title_dashboard: "Dashboard",
+    sub_dashboard: "Central de Controle do PlayStation 4",
+    title_games: "Jogos & Aplicativos",
+    sub_games: "Biblioteca instalada e estatísticas de jogo",
+    title_files: "Gerenciador de Arquivos",
+    sub_files: "Explorador FTP do sistema de arquivos",
+    title_cheats: "Cheats & Mods",
+    sub_cheats: "Gerenciador de Cheats do GoldHEN",
+    title_pkgs: "Pacotes PKG",
+    sub_pkgs: "Instalação e gerenciamento de arquivos .pkg",
+    title_media: "Capturas & Prints",
+    sub_media: "Screenshots gravados diretamente no console",
+    title_tools: "Payloads & Ações",
+    sub_tools: "Ferramentas do sistema, notificações OSD, RPI e injeção",
+    title_settings: "Configurações",
+    sub_settings: "Parâmetros de rede e conexão com o console",
+    title_donate: "Apoiar o Projeto",
+    sub_donate: "Contribua com o desenvolvimento contínuo do Orbis Web Manager",
+
+    stat_console_status: "Status do Console",
+    stat_active_profile: "Perfil Ativo",
+    stat_installed_games: "Jogos Instalados",
+    stat_storage_pkgs: "Armazenamento / PKGs",
+    stat_connecting: "Conectando...",
+    stat_online: "Online • Conectado",
+    stat_offline: "Console Desconectado",
+    stat_games_sub: "Títulos com metadados e capas",
+    stat_cheats_avail: "Cheats Disponíveis",
+    stat_pkgs_sub: "pacotes em /data/pkg/",
+    stat_ready_install: "Pronto p/ Instalar",
+    stat_fw_jailbreak: "FW: 9.00 / 11.00 • Jailbreak Ativo",
+
+    quick_actions: "Ações Rápidas",
+    act_upload_pkg_title: "Enviar PKG",
+    act_upload_pkg_desc: "Upload direto para /data/pkg/",
+    act_upload_cheat_title: "Novo Cheat JSON",
+    act_upload_cheat_desc: "Enviar ou converter código",
+    act_browse_files_title: "Explorar Disco",
+    act_browse_files_desc: "Navegar pelas pastas do PS4",
+    act_convert_cheat_title: "Conversor CUSA",
+    act_convert_cheat_desc: "Adaptar cheat de outra região",
+
+    tool_backup_title: "Backup de Emergência (app.db)",
+    tool_backup_desc: "Baixe uma cópia de segurança imediata da base de dados de jogos e aplicativos do PS4 (/system_data/priv/mms/app.db). Essencial para restaurar sua biblioteca caso corrompa!",
+    tool_backup_btn: "Baixar Backup do app.db (.db)",
+    tool_notify_title: "Notificação na Tela da TV (Notify OSD)",
+    tool_notify_desc: "Envie uma mensagem em tempo real para pipocar no canto da tela do PlayStation 4 enquanto estiver jogando ou navegando na dashboard.",
+    tool_notify_ph: "Ex: Pizza chegou! / Backup concluído",
+    tool_notify_btn: "Enviar Notificação para a TV",
+    tool_rpi_title: "Instalador Remoto de Pacotes (GoldHEN RPI)",
+    tool_rpi_desc: "Mande o PS4 instalar pacotes (.pkg) direto via rede HTTP (Porta 12800) em segundo plano, sem ocupar o dobro de espaço no HD.",
+    tool_rpi_btn: "Disparar Instalação no PS4 (RPI)",
+    tool_payload_title: "Injeção de Payload (.bin)",
+    tool_payload_desc: "Envie arquivos de payload compilados diretamente para a porta 9090 (BinLoader Server do GoldHEN).",
+    tool_payload_file_label: "Arquivo de Payload (.bin)",
+    tool_payload_btn: "Enviar Payload para o PS4",
+    tool_phone_title: "Conectar no Smartphone",
+    tool_phone_desc: "Acesse o painel direto pelo navegador do seu celular (Chrome, Safari, etc.) na mesma rede Wi-Fi.",
+    tool_phone_addr: "Endereço de Acesso Móvel:",
+
+    settings_title: "Configurações de Conexão com o PlayStation 4",
+    settings_sub: "Ajuste o IP e as portas de rede do console.",
+    settings_ip: "Endereço de IP do PS4",
+    settings_ftp: "Porta FTP (GoldHEN)",
+    settings_payload: "Porta Payload (BinLoader)",
+    settings_save: "Salvar Configurações",
+
+    donate_main_title: "Apoie o Desenvolvimento do Orbis Web Manager ❤️",
+    donate_main_desc: "O Orbis Web Manager é um projeto 100% gratuito e open-source para a comunidade PlayStation 4 Jailbreak. Sua contribuição fortalece e acelera novas funções!",
+    donate_pix_badge: "Brasil • Pix Instantâneo",
+    donate_pix_title: "Doação via Pix",
+    donate_pix_desc: "Escaneie o QR Code abaixo com o aplicativo do seu banco ou use a chave aleatória:",
+    donate_pix_key_label: "Chave Aleatória:",
+    donate_pix_copy_btn: "Copiar Chave Pix",
+    donate_bmac_badge: "Internacional",
+    donate_bmac_title: "Buy Me a Coffee",
+    donate_bmac_desc: "Apoie com um café para impulsionar novos recursos, cheats atualizados e compatibilidade contínua:",
+    donate_bmac_strong: "Apoio Internacional",
+    donate_bmac_methods: "Cartão, PayPal, Apple Pay",
+    donate_bmac_btn: "Página Buy Me a Coffee",
+    donate_community_title: "Participe da Comunidade Open Source",
+    donate_community_desc: "Deixe uma ⭐ estrela no repositório GitHub para aumentar a visibilidade do projeto na cena PlayStation 4!",
+    donate_github_btn: "Ver Repositório no GitHub"
+  },
+  en: {
+    nav_dashboard: "Dashboard",
+    nav_games: "Games & Apps",
+    nav_files: "Files (FTP)",
+    nav_cheats: "Cheats & Mods",
+    nav_pkgs: "Packages (PKG)",
+    nav_media: "Screenshots & Media",
+    nav_tools: "Payloads & Actions",
+    nav_settings: "Settings",
+    nav_donate: "Support Project",
+
+    topbar_connect_mobile: "Connect Phone",
+    topbar_quick_upload: "Quick Upload",
+
+    title_dashboard: "Dashboard",
+    sub_dashboard: "PlayStation 4 Central Command",
+    title_games: "Games & Applications",
+    sub_games: "Installed library and playtime statistics",
+    title_files: "File Manager",
+    sub_files: "PS4 filesystem FTP explorer",
+    title_cheats: "Cheats & Mods",
+    sub_cheats: "GoldHEN Cheats Manager",
+    title_pkgs: "PKG Packages",
+    sub_pkgs: "Installation and management of .pkg files",
+    title_media: "Screenshots & Media",
+    sub_media: "Direct screenshots captured with the Share button",
+    title_tools: "Payloads & Actions",
+    sub_tools: "System utilities, OSD TV alerts, RPI and payloads",
+    title_settings: "Settings",
+    sub_settings: "Console network parameters and connection",
+    title_donate: "Support the Project",
+    sub_donate: "Contribute to continuous development of Orbis Web Manager",
+
+    stat_console_status: "Console Status",
+    stat_active_profile: "Active Profile",
+    stat_installed_games: "Installed Games",
+    stat_storage_pkgs: "Storage / PKGs",
+    stat_connecting: "Connecting...",
+    stat_online: "Online • Connected",
+    stat_offline: "Console Offline",
+    stat_games_sub: "Titles with covers & metadata",
+    stat_cheats_avail: "Available Cheats",
+    stat_pkgs_sub: "packages in /data/pkg/",
+    stat_ready_install: "Ready to Install",
+    stat_fw_jailbreak: "FW: 9.00 / 11.00 • Jailbreak Active",
+
+    quick_actions: "Quick Actions",
+    act_upload_pkg_title: "Upload PKG",
+    act_upload_pkg_desc: "Direct upload to /data/pkg/",
+    act_upload_cheat_title: "New Cheat JSON",
+    act_upload_cheat_desc: "Upload or convert cheat code",
+    act_browse_files_title: "Explore Disk",
+    act_browse_files_desc: "Browse PS4 storage folders",
+    act_convert_cheat_title: "CUSA Converter",
+    act_convert_cheat_desc: "Adapt cheat from another region",
+
+    tool_backup_title: "Emergency Backup (app.db)",
+    tool_backup_desc: "Download an immediate full safety copy of the PS4 game & app database (/system_data/priv/mms/app.db). Essential to prevent losing your library if the database gets corrupted!",
+    tool_backup_btn: "Download app.db Backup (.db)",
+    tool_notify_title: "TV Screen Notification (Notify OSD)",
+    tool_notify_desc: "Send a live message that pops up on your PlayStation 4 TV screen while playing games or browsing the dashboard.",
+    tool_notify_ph: "e.g., Pizza arrived! / Backup finished",
+    tool_notify_btn: "Send Notification to TV",
+    tool_rpi_title: "Remote Package Installer (GoldHEN RPI)",
+    tool_rpi_desc: "Command your PS4 to install .pkg packages directly over HTTP (Port 12800) in the background without needing double storage space.",
+    tool_rpi_btn: "Trigger PS4 Installation (RPI)",
+    tool_payload_title: "Payload Injection (.bin)",
+    tool_payload_desc: "Send compiled .bin payload files straight to port 9090 (GoldHEN BinLoader Server).",
+    tool_payload_file_label: "Payload File (.bin)",
+    tool_payload_btn: "Send Payload to PS4",
+    tool_phone_title: "Connect via Smartphone",
+    tool_phone_desc: "Access this dashboard directly from your phone's browser (Chrome, Safari, etc.) on the same Wi-Fi network.",
+    tool_phone_addr: "Mobile Access Address:",
+
+    settings_title: "PlayStation 4 Network Connection Settings",
+    settings_sub: "Adjust the console IP address and port configuration.",
+    settings_ip: "PS4 IP Address",
+    settings_ftp: "FTP Port (GoldHEN)",
+    settings_payload: "Payload Port (BinLoader)",
+    settings_save: "Save Settings",
+
+    donate_main_title: "Support Orbis Web Manager Development ❤️",
+    donate_main_desc: "Orbis Web Manager is 100% free and open-source for the PlayStation 4 Jailbreak community. Your support empowers and accelerates new features!",
+    donate_pix_badge: "Brazil • Instant Pix",
+    donate_pix_title: "Donation via Pix",
+    donate_pix_desc: "Scan the QR Code below with your banking app or copy the random key:",
+    donate_pix_key_label: "Random Pix Key:",
+    donate_pix_copy_btn: "Copy Pix Key",
+    donate_bmac_badge: "International",
+    donate_bmac_title: "Buy Me a Coffee",
+    donate_bmac_desc: "Support with a coffee to boost new features, updated cheats, and continuous platform compatibility:",
+    donate_bmac_strong: "International Support",
+    donate_bmac_methods: "Card, PayPal, Apple Pay",
+    donate_bmac_btn: "Buy Me a Coffee Page",
+    donate_community_title: "Join the Open Source Community",
+    donate_community_desc: "Drop a ⭐ star on the GitHub repository to boost the project's visibility across the PlayStation 4 community!",
+    donate_github_btn: "View GitHub Repository"
+  }
+};
+
+function initI18n() {
+  setLanguage(state.lang);
+}
+
+function setLanguage(lang) {
+  state.lang = lang;
+  localStorage.setItem('owm_lang', lang);
+
+  const flagEl = document.getElementById('lang-flag');
+  const codeEl = document.getElementById('lang-code');
+  if (flagEl && codeEl) {
+    if (lang === 'en') {
+      flagEl.textContent = '🇧🇷';
+      codeEl.textContent = 'PT';
+    } else {
+      flagEl.textContent = '🇺🇸';
+      codeEl.textContent = 'EN';
+    }
+  }
+
+  const dict = translations[lang] || translations.pt;
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    const key = el.getAttribute('data-i18n');
+    if (dict[key]) el.textContent = dict[key];
+  });
+
+  document.querySelectorAll('[data-i18n-ph]').forEach(el => {
+    const key = el.getAttribute('data-i18n-ph');
+    if (dict[key]) el.setAttribute('placeholder', dict[key]);
+  });
+
+  updateTabTitles(state.currentTab);
+}
 
 // ================= INITIALIZATION =================
 document.addEventListener('DOMContentLoaded', () => {
+  initI18n();
   initNavigation();
   initDragAndDrop();
   initModals();
@@ -161,6 +397,37 @@ function initNavigation() {
       }
     });
   }
+
+  // Language Toggle Button
+  const btnLang = document.getElementById('btn-lang-toggle');
+  if (btnLang) {
+    btnLang.addEventListener('click', () => {
+      const nextLang = state.lang === 'pt' ? 'en' : 'pt';
+      setLanguage(nextLang);
+      showToast(nextLang === 'en' ? 'Language switched to English!' : 'Idioma alterado para Português!', 'info');
+    });
+  }
+}
+
+function updateTabTitles(tabId) {
+  const d = translations[state.lang] || translations.pt;
+  const titleMap = {
+    dashboard: { title: d.title_dashboard, sub: d.sub_dashboard },
+    games: { title: d.title_games, sub: d.sub_games },
+    files: { title: d.title_files, sub: d.sub_files },
+    cheats: { title: d.title_cheats, sub: d.sub_cheats },
+    pkgs: { title: d.title_pkgs, sub: d.sub_pkgs },
+    media: { title: d.title_media, sub: d.sub_media },
+    tools: { title: d.title_tools, sub: d.sub_tools },
+    settings: { title: d.title_settings, sub: d.sub_settings },
+    donate: { title: d.title_donate, sub: d.sub_donate }
+  };
+
+  const t = titleMap[tabId] || titleMap.dashboard;
+  const titleEl = document.getElementById('page-title-text');
+  const subEl = document.getElementById('page-subtitle-text');
+  if (titleEl) titleEl.textContent = t.title;
+  if (subEl) subEl.textContent = t.sub;
 }
 
 function switchTab(tabId) {
@@ -177,21 +444,7 @@ function switchTab(tabId) {
   });
 
   // Update Topbar Titles
-  const titleMap = {
-    dashboard: { title: 'Dashboard', sub: 'Central de Controle do PlayStation 4' },
-    games: { title: 'Jogos & Aplicativos', sub: 'Biblioteca instalada e estatísticas de jogo' },
-    files: { title: 'Gerenciador de Arquivos', sub: 'Explorador FTP do sistema de arquivos' },
-    cheats: { title: 'Cheats & Mods', sub: 'Gerenciador de Cheats do GoldHEN' },
-    pkgs: { title: 'Pacotes PKG', sub: 'Instalação e gerenciamento de arquivos .pkg' },
-    media: { title: 'Capturas & Prints', sub: 'Screenshots gravados diretamente no console' },
-    tools: { title: 'Payloads & Ações', sub: 'Ferramentas do sistema, notificações OSD, RPI e injeção' },
-    settings: { title: 'Configurações', sub: 'Parâmetros de rede e conexão com o console' },
-    donate: { title: 'Apoiar o Projeto', sub: 'Contribua com o desenvolvimento contínuo do Orbis Web Manager' }
-  };
-
-  const t = titleMap[tabId] || titleMap.dashboard;
-  document.getElementById('page-title-text').textContent = t.title;
-  document.getElementById('page-subtitle-text').textContent = t.sub;
+  updateTabTitles(tabId);
 
   // Trigger lazy loading per tab
   if (tabId === 'files') loadFiles(state.currentPath);
