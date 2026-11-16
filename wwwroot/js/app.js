@@ -501,6 +501,7 @@ function switchTab(tabId) {
   if (tabId === 'pkgs') { loadPkgs(); loadPcPkgs(); }
   if (tabId === 'media') loadCaptures(state.selectedCaptureGame);
   if (tabId === 'settings') loadConfig();
+  if (tabId === 'tools') checkBinLoader();
 }
 
 // ================= DELEGATED ACTIONS (dynamic lists) =================
@@ -1280,10 +1281,34 @@ async function testPorts() {
         <span class="pname">${esc(p.name)} <small>Porta ${p.port} • ${esc(p.use)}</small></span>
         <span class="pstate">${p.open ? 'ABERTA' : 'FECHADA'}</span>
       </div>`).join('');
-    const card = document.getElementById('card-ports');
-    if (card && state.currentTab === 'tools') card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    updateBinLoaderUi(list);
   } catch (err) {
     box.innerHTML = `<div class="text-danger text-sm">${esc(err.message)}</div>`;
+  }
+}
+
+// Live BinLoader state on the payload card (payloads only work while port 9090 is open)
+function updateBinLoaderUi(list) {
+  const port = (state.config && state.config.payload_port) || 9090;
+  const p = list.find(x => x.port === port) || list.find(x => /BinLoader/i.test(x.name));
+  const box = document.getElementById('binloader-status');
+  if (!p || !box) return;
+  box.classList.toggle('open', p.open);
+  box.classList.toggle('closed', !p.open);
+  box.querySelector('.port-status-text').textContent = `BinLoader (porta ${p.port}): ${p.open ? 'aberto, pronto para receber' : 'fechado'}`;
+  document.getElementById('binloader-help').hidden = p.open;
+}
+
+let binLoaderCheckedAt = 0;
+async function checkBinLoader(force) {
+  if (!force && Date.now() - binLoaderCheckedAt < 20000) return;
+  binLoaderCheckedAt = Date.now();
+  const box = document.getElementById('binloader-status');
+  if (box) box.querySelector('.port-status-text').textContent = 'BinLoader: verificando…';
+  try {
+    updateBinLoaderUi(await api('/api/ports', { timeout: 20000 }));
+  } catch (err) {
+    if (box) box.querySelector('.port-status-text').textContent = 'BinLoader: não foi possível verificar';
   }
 }
 
@@ -1570,14 +1595,16 @@ function initForms() {
     btn.disabled = true;
     showToast(`Enviando "${file.name}"...`, 'info');
     try {
-      const data = await api('/api/payload', { method: 'POST', body: file });
+      const data = await api('/api/payload', { method: 'POST', body: file, timeout: 120000 });
       showToast(data.message, 'success');
     } catch (err) {
       showToast(err.message, 'error', 8000);
+      checkBinLoader(true); // show the live state + how to fix it on the card
     } finally {
       btn.disabled = false;
     }
   });
+  document.getElementById('btn-check-binloader').addEventListener('click', () => checkBinLoader(true));
 
   document.getElementById('btn-mkdir').addEventListener('click', async () => {
     const name = prompt('Nome da nova pasta:');

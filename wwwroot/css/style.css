@@ -967,3 +967,10 @@ svg { flex-shrink: 0; }
   .modal-header, .modal-body, .modal-footer { padding-left: var(--s4); padding-right: var(--s4); }
 }
 .panel .action-text strong, .panel .action-text span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* Live service state line (payload card) */
+.port-status { display: flex; align-items: center; gap: var(--s3); padding: var(--s2) var(--s3); border-radius: var(--r-md); background: var(--surface-2); font-size: var(--fs-sm); color: var(--text-2); }
+.port-status .port-status-text { flex: 1; min-width: 0; }
+.port-status.open .status-dot { background: var(--success); box-shadow: 0 0 0 4px var(--success-soft); }
+.port-status.closed .status-dot { background: var(--danger); box-shadow: 0 0 0 4px var(--danger-soft); }
+.port-status.closed { color: var(--text); }

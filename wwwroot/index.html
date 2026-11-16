@@ -444,6 +444,14 @@
                 <label for="payload-file-input" data-i18n="tool_payload_file_label">Arquivo de payload (.bin)</label>
                 <input type="file" id="payload-file-input" accept=".bin,.elf">
               </div>
+              <div class="port-status" id="binloader-status" aria-live="polite">
+                <span class="status-dot"></span><span class="port-status-text">BinLoader (porta 9090): não verificado</span>
+                <button class="btn btn-ghost btn-sm" id="btn-check-binloader">Verificar</button>
+              </div>
+              <div class="warn-box" id="binloader-help" hidden>
+                <strong>O BinLoader do GoldHEN não está escutando.</strong> No PS4, abra o menu do GoldHEN › <em>Server Settings</em> e desligue e ligue <em>BinLoader Server</em>. Se continuar fechado, reinicie o console e ative o GoldHEN de novo. Depois clique em Verificar.
+                Enviar PKGs funciona porque usa o FTP (porta 2121), que é outro serviço.
+              </div>
               <button class="btn btn-primary" id="btn-send-payload"><svg><use href="#i-send"/></svg><span data-i18n="tool_payload_btn">Enviar payload</span></button>
             </div>
 
