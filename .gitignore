@@ -1,0 +1,12 @@
+# Orbis Web Manager - Git Ignore
+cache/
+*.db
+config.json
+*.log
+*.exe
+bin/
+obj/
+.vs/
+.idea/
+.vscode/
+Thumbs.db
