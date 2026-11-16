@@ -1005,6 +1005,96 @@ namespace OrbisWebManager
                 return;
             }
 
+            // 12. BACKUP APP.DB
+            if (path == "/api/backup/appdb")
+            {
+                res.ContentType = "application/octet-stream";
+                string timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
+                res.Headers.Add("Content-Disposition", "attachment; filename=\"app_db_backup_" + timestamp + ".db\"");
+                StreamFtpDownload("/system_data/priv/mms/app.db", res.OutputStream);
+                res.Close();
+                return;
+            }
+
+            // 13. SYSTEM NOTIFY (TV OSD)
+            if (path == "/api/system/notify" && req.HttpMethod == "POST")
+            {
+                string msg = "";
+                using (var r = new StreamReader(req.InputStream, Encoding.UTF8))
+                {
+                    string body = r.ReadToEnd();
+                    var serializer = new JavaScriptSerializer();
+                    var d = serializer.Deserialize<Dictionary<string, object>>(body);
+                    if (d.ContainsKey("message")) msg = d["message"].ToString();
+                }
+
+                if (string.IsNullOrEmpty(msg))
+                {
+                    res.StatusCode = 400;
+                    SendJson(res, new { error = "Mensagem não informada." });
+                    return;
+                }
+
+                bool sent = false;
+                try
+                {
+                    using (var c = new TcpClient())
+                    {
+                        var ar = c.BeginConnect(Settings.ps4_ip, Settings.payload_port, null, null);
+                        bool success = ar.AsyncWaitHandle.WaitOne(1000);
+                        if (success && c.Connected)
+                        {
+                            c.EndConnect(ar);
+                            byte[] notifyBytes = Encoding.UTF8.GetBytes(msg + "\0");
+                            c.GetStream().Write(notifyBytes, 0, notifyBytes.Length);
+                            sent = true;
+                        }
+                    }
+                }
+                catch { }
+
+                SendJson(res, new { success = true, delivered = sent, message = msg });
+                return;
+            }
+
+            // 14. REMOTE PACKAGE INSTALLER (RPI - Port 12800)
+            if (path == "/api/system/rpi" && req.HttpMethod == "POST")
+            {
+                string pkgUrl = "";
+                using (var r = new StreamReader(req.InputStream, Encoding.UTF8))
+                {
+                    string body = r.ReadToEnd();
+                    var serializer = new JavaScriptSerializer();
+                    var d = serializer.Deserialize<Dictionary<string, object>>(body);
+                    if (d.ContainsKey("url")) pkgUrl = d["url"].ToString();
+                }
+
+                try
+                {
+                    var httpReq = (HttpWebRequest)WebRequest.Create("http://" + Settings.ps4_ip + ":12800/api/install");
+                    httpReq.Method = "POST";
+                    httpReq.ContentType = "application/json";
+                    httpReq.Timeout = 4000;
+                    string payload = new JavaScriptSerializer().Serialize(new { type = "direct", packages = new string[] { pkgUrl } });
+                    byte[] data = Encoding.UTF8.GetBytes(payload);
+                    httpReq.ContentLength = data.Length;
+                    using (var s = httpReq.GetRequestStream())
+                    {
+                        s.Write(data, 0, data.Length);
+                    }
+                    using (var r = (HttpWebResponse)httpReq.GetResponse())
+                    {
+                        SendJson(res, new { success = true, status = (int)r.StatusCode });
+                        return;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    SendJson(res, new { success = false, error = "RPI (Porta 12800): " + ex.Message });
+                    return;
+                }
+            }
+
             res.StatusCode = 404;
             SendJson(res, new { error = "Endpoint desconhecido" });
         }

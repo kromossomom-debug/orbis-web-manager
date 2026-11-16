@@ -87,6 +87,80 @@ function initNavigation() {
     loadCaptures(state.selectedCaptureGame);
     showToast('Capturas atualizadas.', 'info');
   });
+
+  // Pix Copy Button
+  const btnCopyPix = document.getElementById('btn-copy-pix');
+  if (btnCopyPix) {
+    btnCopyPix.addEventListener('click', () => {
+      const pixKey = '94af8068-d112-4c69-bcfa-8789b233246e';
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(pixKey).then(() => {
+          showToast('Chave Pix copiada com sucesso! Obrigado pelo apoio! ❤️', 'success');
+        }).catch(() => {
+          showToast(`Chave Pix: ${pixKey}`, 'info');
+        });
+      } else {
+        showToast(`Chave Pix: ${pixKey}`, 'info');
+      }
+    });
+  }
+
+  // Notify TV Button
+  const btnSendNotify = document.getElementById('btn-send-notify');
+  if (btnSendNotify) {
+    btnSendNotify.addEventListener('click', async () => {
+      const input = document.getElementById('notify-msg-input');
+      const msg = input.value.trim();
+      if (!msg) {
+        showToast('Digite uma mensagem para a notificação.', 'error');
+        return;
+      }
+      try {
+        const res = await fetch('/api/system/notify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message: msg })
+        });
+        const d = await res.json();
+        if (d.success) {
+          showToast('Notificação enviada para a tela do PS4!', 'success');
+        } else {
+          showToast('Falha ao enviar notificação.', 'error');
+        }
+      } catch (e) {
+        showToast('Erro ao comunicar com console.', 'error');
+      }
+    });
+  }
+
+  // RPI Trigger Button
+  const btnTriggerRpi = document.getElementById('btn-trigger-rpi');
+  if (btnTriggerRpi) {
+    btnTriggerRpi.addEventListener('click', async () => {
+      const input = document.getElementById('rpi-pkg-url');
+      const url = input.value.trim();
+      if (!url) {
+        showToast('Informe a URL do arquivo .pkg na rede.', 'error');
+        return;
+      }
+      showToast('Enviando comando para o Package Installer (12800)...', 'info');
+      try {
+        const res = await fetch('/api/system/rpi', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url: url })
+        });
+        const d = await res.json();
+        if (d.success) {
+          showToast('Instalação iniciada em segundo plano no PS4!', 'success');
+        } else {
+          showToast(d.error || 'Porta 12800 não respondeu. Certifique-se que o Package Installer está ativo.', 'error');
+        }
+      } catch (e) {
+        showToast('Erro na requisição RPI.', 'error');
+      }
+    });
+  }
 }
 
 function switchTab(tabId) {
@@ -110,8 +184,9 @@ function switchTab(tabId) {
     cheats: { title: 'Cheats & Mods', sub: 'Gerenciador de Cheats do GoldHEN' },
     pkgs: { title: 'Pacotes PKG', sub: 'Instalação e gerenciamento de arquivos .pkg' },
     media: { title: 'Capturas & Prints', sub: 'Screenshots gravados diretamente no console' },
-    tools: { title: 'Payloads & Ações', sub: 'Injeção de payloads e conectividade móvel' },
-    settings: { title: 'Configurações', sub: 'Parâmetros de rede e conexão com o console' }
+    tools: { title: 'Payloads & Ações', sub: 'Ferramentas do sistema, notificações OSD, RPI e injeção' },
+    settings: { title: 'Configurações', sub: 'Parâmetros de rede e conexão com o console' },
+    donate: { title: 'Apoiar o Projeto', sub: 'Contribua com o desenvolvimento contínuo do Orbis Web Manager' }
   };
 
   const t = titleMap[tabId] || titleMap.dashboard;

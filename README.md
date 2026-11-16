@@ -44,12 +44,44 @@ Ele se conecta diretamente ao seu **PlayStation 4** através da rede local (Wi-F
 * Uploader dedicado de PKGs com streaming contínuo.
 * Opção de excluir PKGs após instalação para liberar espaço no HD interno.
 
-### 6. 📱 Acesso pelo Celular (Mobile First)
+### 6. 📸 Galeria de Capturas & Mídias do PS4
+* Navegue e visualize todas as capturas de tela tiradas com o botão Share.
+* Filtro automático por jogo com capas em miniatura.
+* Lightbox em tela cheia com botão de download em alta resolução direto para o seu computador.
+
+### 7. 🎨 Troca de Capas dos Jogos (Custom Covers)
+* Altere a arte de capa de qualquer jogo (`icon0.png`) diretamente pela interface web com upload instantâneo para o console.
+
+### 8. 🚨 Backup de Emergência do Banco de Dados (app.db)
+* Baixe com 1 clique uma cópia íntegra de segurança do `app.db` (`/system_data/priv/mms/app.db`) do seu PS4 para prevenir perda de biblioteca.
+
+### 9. 🔔 Notificações na TV (Notify OSD)
+* Envie mensagens personalizadas que pipocam imediatamente na tela da TV enquanto você estiver jogando no PlayStation 4.
+
+### 10. ⚡ Instalador Remoto de Pacotes (RPI)
+* Dispare a instalação remota de PKGs servidos em rede diretamente na porta `12800` do GoldHEN sem precisar copiar o instalador para o HD interno antes.
+
+### 11. 📱 Acesso pelo Celular (Mobile First)
 * Interface 100% responsiva com **Bottom Navigation Bar** tátil no estilo app nativo.
 * **QR Code Integrado:** Basta apontar a câmera do celular para abrir o painel na hora via Wi-Fi.
 
-### 7. 💉 Injeção de Payloads
+### 12. 💉 Injeção de Payloads
 * Envie arquivos `.bin` diretamente para a porta `9090` do GoldHEN sem precisar de programas externos.
+
+---
+
+## ☕ Apoie o Projeto
+
+O **Orbis Web Manager** é mantido e desenvolvido como software livre para a comunidade PS4 Jailbreak. Se o projeto te ajudou e você deseja incentivar a criação de novos recursos, considere fazer uma contribuição:
+
+* **🇧🇷 Pix (Brasil - Chave Aleatória):**
+  ```text
+  94af8068-d112-4c69-bcfa-8789b233246e
+  ```
+  *(Você também pode escanear o QR Code interativo direto na aba "Apoiar Projeto" dentro do próprio aplicativo!)*
+
+* **🌍 Buy Me a Coffee (Apoio Internacional):**
+  [![Buy Me A Coffee](https://img.shields.io/badge/Buy%20Me%20A%20Coffee-Apoiar-orange?style=for-the-badge&logo=buy-me-a-coffee)](https://buymeacoffee.com/)
 
 ---
 
