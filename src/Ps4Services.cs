@@ -142,6 +142,71 @@ namespace OrbisWebManager
             }
         }
 
+        // ------------------------------------------------------------ ps4debug loader
+
+        /// <summary>
+        /// Downloads the official ps4debug payload from the GoldHEN GitHub releases
+        /// (cached in cache/payloads), sends it to the BinLoader and waits for port 744.
+        /// </summary>
+        public static string LoadPs4Debug()
+        {
+            if (PortOpen(Ps4DebugPort, 1200)) return "O ps4debug já está rodando no PS4. Pode enviar notificações!";
+            if (!PortOpen(Program.Settings.payload_port, 1500))
+                throw new Exception("O BinLoader (porta " + Program.Settings.payload_port + ") está fechado no PS4, então não dá para enviar o ps4debug. " +
+                    "No PS4: reinicie o console e ative o GoldHEN de novo (o BinLoader já está ligado no seu config.ini). Depois clique aqui outra vez.");
+
+            string dir = Path.Combine(Program.CacheDir, "payloads");
+            Directory.CreateDirectory(dir);
+            byte[] payload = null;
+            string name = null;
+
+            try
+            {
+                string json = Covers.HttpGetString("https://api.github.com/repos/GoldHEN/ps4debug/releases/latest", null);
+                var rel = new JavaScriptSerializer().DeserializeObject(json) as Dictionary<string, object>;
+                object assets;
+                if (rel != null && rel.TryGetValue("assets", out assets) && assets is object[])
+                {
+                    foreach (var a in (object[])assets)
+                    {
+                        var ad = a as Dictionary<string, object>;
+                        if (ad == null) continue;
+                        string n = Convert.ToString(ad["name"]);
+                        string url = Convert.ToString(ad["browser_download_url"]);
+                        if (!n.EndsWith(".bin", StringComparison.OrdinalIgnoreCase)) continue;
+                        if (!url.StartsWith("https://github.com/GoldHEN/ps4debug/releases/download/")) continue;
+                        name = Path.GetFileName(n);
+                        string local = Path.Combine(dir, name);
+                        if (File.Exists(local)) payload = File.ReadAllBytes(local);
+                        else
+                        {
+                            payload = Covers.HttpGetBytes(url);
+                            File.WriteAllBytes(local, payload);
+                        }
+                        break;
+                    }
+                }
+            }
+            catch { /* offline: fall back to the cached copy below */ }
+
+            if (payload == null)
+            {
+                var cached = Directory.GetFiles(dir, "ps4debug*.bin");
+                if (cached.Length == 0) throw new Exception("Não foi possível baixar o ps4debug do GitHub (sem internet?). Baixe manualmente em github.com/GoldHEN/ps4debug/releases e envie pelo card 'Injeção de Payload'.");
+                Array.Sort(cached);
+                name = Path.GetFileName(cached[cached.Length - 1]);
+                payload = File.ReadAllBytes(cached[cached.Length - 1]);
+            }
+
+            SendPayload(payload);
+            for (int i = 0; i < 16; i++)
+            {
+                Thread.Sleep(500);
+                if (PortOpen(Ps4DebugPort, 600)) return name + " carregado! As notificações na TV já funcionam.";
+            }
+            return name + " foi enviado ao PS4. Se a porta 744 não abrir em alguns segundos, veja se apareceu algum aviso na TV.";
+        }
+
         // ------------------------------------------------------------ Remote Package Installer
 
         public static string RpiCall(string api, object body)

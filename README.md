@@ -61,7 +61,7 @@ Ele se conecta diretamente ao seu **PlayStation 4** através da rede local (Wi-F
 
 ### 9. 🔔 Notificações na TV (Notify OSD)
 * Envie mensagens personalizadas que pipocam na tela da TV enquanto você estiver jogando no PlayStation 4.
-* **Requer o payload `ps4debug` carregado** (porta `744`). Carregue-o pelo menu de Payloads do GoldHEN (se a sua versão tiver) ou envie o `ps4debug.bin` pela aba *Payloads & Ações*.
+* **Requer o payload `ps4debug` carregado** (porta `744`). Em *Payloads & Ações*, clique em **Carregar ps4debug**: o app baixa a versão oficial ([GoldHEN/ps4debug](https://github.com/GoldHEN/ps4debug/releases)), guarda uma cópia em `cache/payloads/` e envia pelo BinLoader (porta `9090`, que precisa estar aberta). Repita a cada vez que ligar o PS4.
 * A porta `9090` (BinLoader) **não** serve para notificações: ela só aceita payloads executáveis. Versões anteriores deste app mandavam o texto da mensagem para a 9090, e por isso nada aparecia na TV.
 
 ### 10. ⚡ Instalador Remoto de Pacotes (RPI)

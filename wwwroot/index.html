@@ -2,94 +2,122 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Orbis Manager • PlayStation 4 Web Suite</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#0b0d12">
+  <title>Orbis Web Manager • PS4</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
   <link rel="stylesheet" href="/css/style.css">
-  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%230070d1'><path d='M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14H9v-2h2v2zm0-4H9V7h2v5zm4 4h-2v-2h2v2zm0-4h-2V7h2v5z'/></svg>">
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><rect width='24' height='24' rx='6' fill='%233b8bff'/><path d='M6 15.5l3-7h1.6l3 7M7.2 13h4.8M15.5 8.5v7M15.5 8.5h1.7a2 2 0 010 4h-1.7' stroke='white' stroke-width='1.6' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>">
 </head>
-<body class="theme-dark">
+<body>
 
-  <!-- APP SHELL -->
+  <!-- Icon sprite (stroke icons, 24px grid) -->
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <defs>
+      <symbol id="i-home" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5L12 3l9 7.5V20a1 1 0 01-1 1h-5v-6h-6v6H4a1 1 0 01-1-1z"/></symbol>
+      <symbol id="i-games" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="4"/><path d="M7 10v4M5 12h4"/><circle cx="15.5" cy="11" r=".6" fill="currentColor"/><circle cx="17.5" cy="13" r=".6" fill="currentColor"/></symbol>
+      <symbol id="i-image" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="9" cy="9" r="1.6"/><path d="M21 15l-5-5L5 21"/></symbol>
+      <symbol id="i-folder" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></symbol>
+      <symbol id="i-package" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8l-9-5-9 5v8l9 5 9-5z"/><path d="M3 8l9 5 9-5M12 13v8"/></symbol>
+      <symbol id="i-bolt" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L4 14h7l-1 8 9-12h-7z"/></symbol>
+      <symbol id="i-tool" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.8-3.8a6 6 0 01-7.9 7.9l-6.9 6.9a2.1 2.1 0 01-3-3l6.9-6.9a6 6 0 017.9-7.9z"/></symbol>
+      <symbol id="i-settings" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 00.3 1.8l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.7 1.7 0 00-1.8-.3 1.7 1.7 0 00-1 1.5V21a2 2 0 11-4 0v-.1a1.7 1.7 0 00-1.1-1.5 1.7 1.7 0 00-1.8.3l-.1.1a2 2 0 11-2.8-2.8l.1-.1a1.7 1.7 0 00.3-1.8 1.7 1.7 0 00-1.5-1H3a2 2 0 110-4h.1a1.7 1.7 0 001.5-1.1 1.7 1.7 0 00-.3-1.8l-.1-.1a2 2 0 112.8-2.8l.1.1a1.7 1.7 0 001.8.3H9a1.7 1.7 0 001-1.5V3a2 2 0 114 0v.1a1.7 1.7 0 001 1.5 1.7 1.7 0 001.8-.3l.1-.1a2 2 0 112.8 2.8l-.1.1a1.7 1.7 0 00-.3 1.8V9a1.7 1.7 0 001.5 1H21a2 2 0 110 4h-.1a1.7 1.7 0 00-1.5 1z"/></symbol>
+      <symbol id="i-heart" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20.8 4.6a5.5 5.5 0 00-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 00-7.8 7.8l1 1.1L12 21l7.8-7.5 1-1.1a5.5 5.5 0 000-7.8z"/></symbol>
+      <symbol id="i-upload" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M16 8l-4-4-4 4M12 4v12"/></symbol>
+      <symbol id="i-download" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M8 12l4 4 4-4M12 4v12"/></symbol>
+      <symbol id="i-refresh" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11a8 8 0 00-14.9-3.9M4 4v4h4M4 13a8 8 0 0014.9 3.9M20 20v-4h-4"/></symbol>
+      <symbol id="i-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></symbol>
+      <symbol id="i-plus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></symbol>
+      <symbol id="i-swap" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7h13l-4-4M17 17H4l4 4"/></symbol>
+      <symbol id="i-bell" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 00-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 01-3.4 0"/></symbol>
+      <symbol id="i-send" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4z"/></symbol>
+      <symbol id="i-save" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><path d="M17 21v-8H7v8M7 3v5h8"/></symbol>
+      <symbol id="i-pulse" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></symbol>
+      <symbol id="i-phone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="2" width="12" height="20" rx="3"/><path d="M11 18h2"/></symbol>
+      <symbol id="i-play" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M6 4l14 8-14 8z"/></symbol>
+      <symbol id="i-menu" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></symbol>
+      <symbol id="i-help" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.1 9a3 3 0 015.8 1c0 2-3 3-3 3M12 17h.01"/></symbol>
+      <symbol id="i-globe" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 010 18M12 3a14 14 0 000 18"/></symbol>
+      <symbol id="i-console" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7" width="18" height="10" rx="2"/><path d="M7 12h3M17 12h.01"/></symbol>
+      <symbol id="i-alert" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.9L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0zM12 9v4M12 17h.01"/></symbol>
+      <symbol id="i-more" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="19" cy="12" r="1.7"/></symbol>
+      <symbol id="i-qr" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3M21 14v.01M17 21h4v-4M14 21v-3"/></symbol>
+      <symbol id="i-copy" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></symbol>
+      <symbol id="i-star" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M12 2l3.1 6.3 6.9 1-5 4.9 1.2 6.8L12 17.8 5.8 21l1.2-6.8-5-4.9 6.9-1z"/></symbol>
+    </defs>
+  </svg>
+
   <div class="app-layout">
-    
-    <!-- SIDEBAR (DESKTOP) -->
-    <aside class="sidebar">
+
+    <!-- ============ SIDEBAR ============ -->
+    <aside class="sidebar" id="sidebar" aria-label="Menu principal">
       <div class="brand">
-        <div class="brand-logo">
-          <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2">
-            <rect x="2" y="6" width="20" height="12" rx="3" stroke="#00d2ff"/>
-            <circle cx="8" cy="12" r="2" fill="#0070d1"/>
-            <path d="M16 10v4M14 12h4" stroke="#00d2ff" stroke-linecap="round"/>
-          </svg>
-        </div>
+        <div class="brand-logo" aria-hidden="true"><svg width="20" height="20"><use href="#i-console"/></svg></div>
         <div class="brand-text">
           <h2>ORBIS <span>WEB</span></h2>
-          <span class="badge-ps4">PS4 • GoldHEN</span>
+          <span class="badge-ps4">PS4 · GoldHEN</span>
         </div>
       </div>
 
       <nav class="nav-menu">
+        <div class="nav-group-label">Início</div>
         <button class="nav-item active" data-tab="dashboard">
-          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
-          <span data-i18n="nav_dashboard">Dashboard</span>
+          <svg><use href="#i-home"/></svg><span data-i18n="nav_dashboard">Dashboard</span>
         </button>
+
+        <div class="nav-group-label">Biblioteca</div>
         <button class="nav-item" data-tab="games">
-          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 12h4m-2-2v4m10-2h.01m-3 0h.01"/></svg>
-          <span data-i18n="nav_games">Jogos & Apps</span>
+          <svg><use href="#i-games"/></svg><span data-i18n="nav_games">Jogos & Apps</span>
           <span class="nav-badge" id="games-count-badge">0</span>
         </button>
-        <button class="nav-item" data-tab="files">
-          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/></svg>
-          <span data-i18n="nav_files">Arquivos (FTP)</span>
+        <button class="nav-item" data-tab="media">
+          <svg><use href="#i-image"/></svg><span data-i18n="nav_media">Capturas & Prints</span>
         </button>
-        <button class="nav-item" data-tab="cheats">
-          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
-          <span data-i18n="nav_cheats">Cheats & Mods</span>
-          <span class="nav-badge cheat" id="cheats-count-badge">0</span>
+
+        <div class="nav-group-label">Console</div>
+        <button class="nav-item" data-tab="files">
+          <svg><use href="#i-folder"/></svg><span data-i18n="nav_files">Arquivos (FTP)</span>
         </button>
         <button class="nav-item" data-tab="pkgs">
-          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
-          <span data-i18n="nav_pkgs">Pacotes (PKG)</span>
-          <span class="nav-badge pkg" id="pkgs-count-badge">0</span>
+          <svg><use href="#i-package"/></svg><span data-i18n="nav_pkgs">Pacotes (PKG)</span>
+          <span class="nav-badge" id="pkgs-count-badge">0</span>
         </button>
-        <button class="nav-item" data-tab="media">
-          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
-          <span data-i18n="nav_media">Capturas & Prints</span>
+        <button class="nav-item" data-tab="cheats">
+          <svg><use href="#i-bolt"/></svg><span data-i18n="nav_cheats">Cheats & Mods</span>
+          <span class="nav-badge" id="cheats-count-badge">0</span>
         </button>
+
+        <div class="nav-group-label">Ferramentas</div>
         <button class="nav-item" data-tab="tools">
-          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/></svg>
-          <span data-i18n="nav_tools">Payloads & Ações</span>
+          <svg><use href="#i-tool"/></svg><span data-i18n="nav_tools">Payloads & Ações</span>
         </button>
         <button class="nav-item" data-tab="settings">
-          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
-          <span data-i18n="nav_settings">Configurações</span>
+          <svg><use href="#i-settings"/></svg><span data-i18n="nav_settings">Configurações</span>
         </button>
         <button class="nav-item" data-tab="donate">
-          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z"/></svg>
-          <span data-i18n="nav_donate">Apoiar Projeto</span>
-          <span class="nav-badge" style="background: rgba(255, 71, 87, 0.2); color: #ff4757; border: 1px solid rgba(255, 71, 87, 0.4);">Pix</span>
+          <svg><use href="#i-heart"/></svg><span data-i18n="nav_donate">Apoiar Projeto</span>
         </button>
       </nav>
 
       <div class="sidebar-footer">
-        <div class="console-pill" id="console-status-pill">
-          <span class="status-dot pulsing"></span>
+        <div class="console-pill" id="console-status-pill" role="status">
+          <span class="status-dot" id="sidebar-dot"></span>
           <div class="console-meta">
-            <span class="ps4-name" id="user-display">PS4 Conectado</span>
-            <span class="ps4-ip" id="ip-display">Carregando...</span>
+            <span class="ps4-name" id="user-display">PlayStation 4</span>
+            <span class="ps4-ip" id="ip-display">conectando…</span>
           </div>
         </div>
       </div>
     </aside>
 
-    <!-- MAIN VIEW -->
+    <!-- ============ MAIN ============ -->
     <main class="main-content">
-      
-      <!-- TOPBAR -->
       <header class="topbar">
         <div class="topbar-left">
-          <button class="mobile-menu-btn" id="mobile-menu-toggle">
-            <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" fill="none" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+          <button class="btn btn-ghost btn-icon mobile-menu-btn" id="mobile-menu-toggle" aria-label="Abrir menu" aria-controls="sidebar">
+            <svg><use href="#i-menu"/></svg>
           </button>
           <div class="page-title">
             <h1 id="page-title-text">Dashboard</h1>
@@ -98,585 +126,485 @@
         </div>
 
         <div class="topbar-right">
-          <div class="ping-pill" id="ping-indicator">
-            <span class="ping-wave"></span>
+          <div class="ping-pill hide-mobile" id="ping-indicator" title="Latência até o console">
+            <span class="status-dot" id="ping-dot"></span>
             <span class="ping-val">-- ms</span>
           </div>
-          <button class="btn btn-outline" id="btn-tour-start" title="Guia Interativo / Interactive Tour" style="display: flex; align-items: center; gap: 6px;">
-            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3m0 4h.01"/></svg>
-            <span class="hide-mobile" data-i18n="topbar_tutorial">Tutorial</span>
+          <button class="btn btn-ghost btn-icon" id="btn-tour-start" aria-label="Tutorial interativo" title="Tutorial">
+            <svg><use href="#i-help"/></svg>
           </button>
-          <button class="btn btn-outline" id="btn-lang-toggle" title="Alterar Idioma / Switch Language" style="display: flex; align-items: center; gap: 6px;">
-            <span id="lang-flag">🇺🇸</span>
-            <span id="lang-code" style="font-weight: 700;">EN</span>
+          <button class="btn btn-ghost" id="btn-lang-toggle" aria-label="Alterar idioma" title="Alterar idioma / Switch language">
+            <svg><use href="#i-globe"/></svg>
+            <span id="lang-flag" class="sr-only"></span><span id="lang-code">EN</span>
           </button>
-          <button class="btn btn-outline" id="btn-qr-mobile" title="Abrir no Celular">
-            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"/></svg>
-            <span class="hide-mobile" data-i18n="topbar_connect_mobile">Conectar Celular</span>
+          <button class="btn btn-ghost btn-icon hide-mobile" id="btn-qr-mobile" aria-label="Abrir no celular" title="Abrir no celular">
+            <svg><use href="#i-qr"/></svg>
           </button>
           <button class="btn btn-primary" id="btn-quick-upload">
-            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
-            <span data-i18n="topbar_quick_upload">Upload Rápido</span>
+            <svg><use href="#i-upload"/></svg>
+            <span class="hide-mobile" data-i18n="topbar_quick_upload">Upload Rápido</span>
           </button>
         </div>
       </header>
 
-      <!-- TAB CONTENT PANES -->
       <div class="content-scroll">
 
-        <!-- ================= TAB: DASHBOARD ================= -->
-        <section class="tab-pane active" id="pane-dashboard">
-          
-          <!-- HERO STATS CARDS -->
-          <div class="stats-grid">
-            <div class="card stat-card glow-blue">
-              <div class="stat-header">
-                <span class="stat-title" data-i18n="stat_console_status">Status do Console</span>
-                <span class="stat-icon blue">
-                  <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
-                </span>
+        <!-- ============ DASHBOARD ============ -->
+        <section class="tab-pane active" id="pane-dashboard" aria-labelledby="page-title-text">
+
+          <div class="conn-banner" id="conn-banner" role="alert" hidden>
+            <svg class="banner-icon"><use href="#i-alert"/></svg>
+            <div class="grow">
+              <strong id="conn-banner-title">Não foi possível falar com o PS4</strong>
+              <p id="conn-banner-text">Confira se o console está ligado, com o GoldHEN ativo, e se o IP em Configurações está correto.</p>
+            </div>
+            <button class="btn btn-outline btn-sm" id="btn-banner-retry"><svg><use href="#i-refresh"/></svg>Tentar de novo</button>
+            <button class="btn btn-primary btn-sm" data-tab-trigger="settings">Abrir Configurações</button>
+          </div>
+
+          <div class="hero-grid">
+            <!-- Console card -->
+            <div class="card console-card">
+              <div class="console-head">
+                <div class="console-avatar" aria-hidden="true"><svg><use href="#i-console"/></svg></div>
+                <div class="grow">
+                  <div class="status-text"><span class="status-dot" id="console-dot"></span><span id="dash-online-status">Conectando…</span></div>
+                  <div class="console-sub" id="dash-banner">GoldHEN FTP Server</div>
+                </div>
               </div>
-              <div class="stat-body">
-                <div class="stat-val status-text" id="dash-online-status">Conectando...</div>
-                <div class="stat-sub" id="dash-banner">GoldHEN FTP Server v2.2</div>
+              <div class="console-facts">
+                <span class="badge" id="dash-user-badge"><svg width="12" height="12"><use href="#i-games"/></svg><span id="dash-user">—</span></span>
+                <span class="badge outline" id="dash-fw-badge">FW —</span>
+                <span class="badge outline mono" id="dash-port-ftp">FTP —</span>
               </div>
-              <div class="stat-footer">
-                <span class="badge" id="dash-port-ftp">FTP: 2121</span>
-                <button class="badge badge-btn" id="dash-port-payload" data-tab-trigger="tools" title="Testar todas as portas do console">Testar portas &rarr;</button>
+              <!-- KPIs -->
+              <div class="stats-grid">
+                <button class="card stat-card" data-tab-trigger="games">
+                  <span class="stat-icon"><svg><use href="#i-games"/></svg></span>
+                  <span class="stat-body">
+                    <span class="stat-title" data-i18n="stat_installed_games">Jogos Instalados</span>
+                    <span class="stat-val" id="dash-games-count">—</span>
+                  </span>
+                </button>
+                <button class="card stat-card" data-tab-trigger="cheats">
+                  <span class="stat-icon"><svg><use href="#i-bolt"/></svg></span>
+                  <span class="stat-body">
+                    <span class="stat-title" data-i18n="stat_cheats_avail">Cheats Disponíveis</span>
+                    <span class="stat-val" id="dash-active-cheats">—</span>
+                  </span>
+                </button>
+                <button class="card stat-card" data-tab-trigger="pkgs">
+                  <span class="stat-icon"><svg><use href="#i-package"/></svg></span>
+                  <span class="stat-body">
+                    <span class="stat-title" data-i18n="stat_storage_pkgs">Armazenamento / PKGs</span>
+                    <span class="stat-val" id="dash-pkg-size">—</span>
+                    <span class="stat-sub" id="dash-pkg-count">em /data/pkg/</span>
+                  </span>
+                </button>
               </div>
             </div>
 
-            <div class="card stat-card glow-cyan">
-              <div class="stat-header">
-                <span class="stat-title" data-i18n="stat_active_profile">Perfil Ativo</span>
-                <span class="stat-icon cyan">
-                  <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-                </span>
+            <!-- Health checklist -->
+            <div class="card health-card">
+              <div class="card-head">
+                <div>
+                  <h3>O que está funcionando</h3>
+                  <p class="text-muted">Serviços do console usados pelo app</p>
+                </div>
+                <button class="btn btn-ghost btn-sm" id="dash-port-payload" aria-label="Verificar serviços novamente"><svg><use href="#i-refresh"/></svg>Verificar</button>
               </div>
-              <div class="stat-body">
-                <div class="stat-val" id="dash-user">Carregando...</div>
-                <div class="stat-sub">PlayStation Network / Local ID</div>
-              </div>
-              <div class="stat-footer">
-                <span class="badge outline" id="dash-fw-badge">FW: 9.00 • GoldHEN v2.2</span>
-              </div>
-            </div>
-
-            <div class="card stat-card glow-purple">
-              <div class="stat-header">
-                <span class="stat-title" data-i18n="stat_installed_games">Jogos Instalados</span>
-                <span class="stat-icon purple">
-                  <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 12h4m-2-2v4m10-2h.01m-3 0h.01"/></svg>
-                </span>
-              </div>
-              <div class="stat-body">
-                <div class="stat-val" id="dash-games-count">--</div>
-                <div class="stat-sub" data-i18n="stat_games_sub">Títulos com metadados e capas</div>
-              </div>
-              <div class="stat-footer">
-                <span class="badge" id="dash-active-cheats" data-i18n="stat_cheats_avail">Cheats Disponíveis</span>
-              </div>
-            </div>
-
-            <div class="card stat-card glow-green">
-              <div class="stat-header">
-                <span class="stat-title" data-i18n="stat_storage_pkgs">Armazenamento / PKGs</span>
-                <span class="stat-icon green">
-                  <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
-                </span>
-              </div>
-              <div class="stat-body">
-                <div class="stat-val" id="dash-pkg-size">-- GB</div>
-                <div class="stat-sub" id="dash-pkg-count">-- pacotes em /data/pkg/</div>
-              </div>
-              <div class="stat-footer">
-                <span class="badge outline" data-i18n="stat_ready_install">Pronto p/ Instalar</span>
+              <div class="health-list" id="health-list">
+                <div class="text-muted text-sm">Clique em Verificar para testar os serviços.</div>
               </div>
             </div>
           </div>
 
-          <!-- QUICK ACTIONS BAR -->
+          <!-- Continue playing -->
+          <div class="section-header">
+            <div class="section-title-wrap">
+              <h3>Mais jogados</h3>
+              <p>Tempo registrado pelo GoldHEN</p>
+            </div>
+            <button class="btn btn-ghost btn-sm" data-tab-trigger="games">Ver biblioteca &rarr;</button>
+          </div>
+          <div class="recent-games-slider" id="dash-recent-games">
+            <div class="loading-state"><div class="spinner"></div><span>Carregando biblioteca…</span></div>
+          </div>
+
+          <!-- Quick actions -->
           <div class="section-header">
             <h3 data-i18n="quick_actions">Ações Rápidas</h3>
           </div>
           <div class="quick-action-grid">
             <button class="action-btn" id="action-upload-pkg">
-              <div class="action-icon bg-blue">
-                <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
-              </div>
-              <div class="action-text">
+              <span class="action-icon"><svg><use href="#i-package"/></svg></span>
+              <span class="action-text">
                 <strong data-i18n="act_upload_pkg_title">Enviar PKG</strong>
                 <span data-i18n="act_upload_pkg_desc">Upload direto para /data/pkg/</span>
-              </div>
+              </span>
             </button>
-
             <button class="action-btn" id="action-upload-cheat">
-              <div class="action-icon bg-cyan">
-                <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
-              </div>
-              <div class="action-text">
+              <span class="action-icon"><svg><use href="#i-bolt"/></svg></span>
+              <span class="action-text">
                 <strong data-i18n="act_upload_cheat_title">Novo Cheat JSON</strong>
                 <span data-i18n="act_upload_cheat_desc">Enviar ou converter código</span>
-              </div>
+              </span>
             </button>
-
             <button class="action-btn" id="action-browse-files">
-              <div class="action-icon bg-purple">
-                <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/></svg>
-              </div>
-              <div class="action-text">
+              <span class="action-icon"><svg><use href="#i-folder"/></svg></span>
+              <span class="action-text">
                 <strong data-i18n="act_browse_files_title">Explorar Disco</strong>
                 <span data-i18n="act_browse_files_desc">Navegar pelas pastas do PS4</span>
-              </div>
+              </span>
             </button>
-
             <button class="action-btn" id="action-convert-cheat">
-              <div class="action-icon bg-amber">
-                <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/></svg>
-              </div>
-              <div class="action-text">
+              <span class="action-icon"><svg><use href="#i-swap"/></svg></span>
+              <span class="action-text">
                 <strong data-i18n="act_convert_cheat_title">Conversor CUSA</strong>
                 <span data-i18n="act_convert_cheat_desc">Adaptar cheat de outra região</span>
-              </div>
+              </span>
             </button>
           </div>
-
-          <!-- RECENT GAMES ROW -->
-          <div class="section-header mt-4">
-            <div class="section-title-wrap">
-              <h3>Jogos Recentes & Mais Jogados</h3>
-              <p>Extraído das estatísticas do GoldHEN</p>
-            </div>
-            <button class="btn btn-sm btn-outline" data-tab-trigger="games">Ver Todos &rarr;</button>
-          </div>
-          <div class="recent-games-slider" id="dash-recent-games">
-            <div class="loading-state">
-              <div class="spinner"></div>
-              <span>Carregando biblioteca de jogos do console...</span>
-            </div>
-          </div>
-
         </section>
 
-        <!-- ================= TAB: JOGOS & APPS ================= -->
+        <!-- ============ GAMES ============ -->
         <section class="tab-pane" id="pane-games">
           <div class="toolbar">
-            <div class="search-box">
-              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
-              <input type="text" id="games-search-input" placeholder="Buscar por título ou Title ID (ex: Diablo, CUSA00243)...">
-            </div>
+            <label class="search-box">
+              <svg><use href="#i-search"/></svg>
+              <span class="sr-only">Buscar jogos</span>
+              <input type="search" id="games-search-input" placeholder="Buscar por nome ou Title ID (ex: Diablo, CUSA00243)">
+            </label>
             <div class="toolbar-actions">
-              <select id="games-sort" class="select-sm" title="Ordenar">
+              <label class="sr-only" for="games-sort">Ordenar</label>
+              <select id="games-sort" class="select-sm">
                 <option value="played">Mais jogados</option>
-                <option value="name">Nome (A-Z)</option>
+                <option value="name">Nome (A–Z)</option>
                 <option value="recent">Instalados recentemente</option>
                 <option value="starts">Mais iniciados</option>
               </select>
-              <button class="btn btn-outline" id="btn-refresh-games" title="Clique: atualizar. Shift+Clique: atualização completa (relê nomes e capas)">
-                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
-                <span>Recarregar</span>
+              <button class="btn btn-outline" id="btn-refresh-games" title="Shift+clique: atualização completa (relê nomes e capas)">
+                <svg><use href="#i-refresh"/></svg><span>Atualizar</span>
               </button>
             </div>
           </div>
-          <div class="list-status" id="games-status"></div>
-
-          <div class="games-grid" id="games-container">
-            <!-- Dynamically injected with cover changer buttons -->
-          </div>
+          <div class="list-status" id="games-status" aria-live="polite"></div>
+          <div class="games-grid" id="games-container"></div>
         </section>
 
-        <!-- ================= TAB: ARQUIVOS (FTP) ================= -->
+        <!-- ============ FILES ============ -->
         <section class="tab-pane" id="pane-files">
-          <div class="file-explorer-card card">
-            
-            <!-- PATH BREADCRUMB & TOOLBAR -->
+          <div class="card file-explorer-card">
             <div class="file-toolbar">
-              <div class="breadcrumb" id="file-breadcrumb">
-                <span class="crumb" data-path="/data/">/data</span>
-              </div>
+              <nav class="breadcrumb" id="file-breadcrumb" aria-label="Caminho atual"></nav>
               <div class="file-actions">
-                <button class="btn btn-sm btn-outline" id="btn-mkdir">
-                  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 4v16m8-8H4"/></svg>
-                  <span>Nova Pasta</span>
-                </button>
-                <button class="btn btn-sm btn-primary" id="btn-upload-file">
-                  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
-                  <span>Fazer Upload</span>
-                </button>
+                <button class="btn btn-outline btn-sm" id="btn-mkdir"><svg><use href="#i-plus"/></svg><span>Nova pasta</span></button>
+                <button class="btn btn-primary btn-sm" id="btn-upload-file"><svg><use href="#i-upload"/></svg><span>Enviar arquivos</span></button>
               </div>
             </div>
-
-            <!-- QUICK SHORTCUTS -->
-            <div class="quick-paths">
+            <div class="quick-paths" role="toolbar" aria-label="Atalhos de pastas">
               <button class="path-chip active" data-path="/data/">/data</button>
-              <button class="path-chip" data-path="/data/pkg/">/data/pkg (PKGs)</button>
-              <button class="path-chip" data-path="/data/GoldHEN/cheats/json/">/cheats/json</button>
-              <button class="path-chip" data-path="/data/GoldHEN/plugins/">/plugins</button>
-              <button class="path-chip" data-path="/user/home/">/user/home</button>
-              <button class="path-chip" data-path="/user/appmeta/">/user/appmeta</button>
-              <button class="path-chip" data-path="/user/av_contents/photo/NPXS20001/">Capturas de Tela</button>
+              <button class="path-chip" data-path="/data/pkg/">PKGs</button>
+              <button class="path-chip" data-path="/data/GoldHEN/cheats/json/">Cheats</button>
+              <button class="path-chip" data-path="/data/GoldHEN/plugins/">Plugins</button>
+              <button class="path-chip" data-path="/user/home/">Usuários</button>
+              <button class="path-chip" data-path="/user/appmeta/">Appmeta (capas)</button>
+              <button class="path-chip" data-path="/user/av_contents/photo/NPXS20001/">Capturas</button>
             </div>
-
-            <!-- DROP ZONE -->
             <div class="drop-zone" id="file-drop-zone">
-              <svg viewBox="0 0 24 24" width="36" height="36" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
-              <span>Arraste e solte arquivos aqui para enviar diretamente para o PS4</span>
+              <svg><use href="#i-upload"/></svg>
+              <span>Arraste arquivos para cá para enviar à pasta atual</span>
             </div>
-
-            <!-- TABLE OF FILES -->
             <div class="file-table-wrap">
               <table class="file-table">
                 <thead>
                   <tr>
-                    <th>Nome</th>
-                    <th style="width: 140px;">Tamanho</th>
-                    <th style="width: 160px;">Data</th>
-                    <th style="width: 140px; text-align: right;">Ações</th>
+                    <th scope="col">Nome</th>
+                    <th scope="col" class="col-size">Tamanho</th>
+                    <th scope="col" class="col-date">Data</th>
+                    <th scope="col" class="col-actions"><span class="sr-only">Ações</span></th>
                   </tr>
                 </thead>
-                <tbody id="file-table-body">
-                  <!-- Dynamically populated -->
-                </tbody>
+                <tbody id="file-table-body"></tbody>
               </table>
             </div>
-
           </div>
         </section>
 
-        <!-- ================= TAB: CHEATS & MODS ================= -->
+        <!-- ============ CHEATS ============ -->
         <section class="tab-pane" id="pane-cheats">
           <div class="toolbar">
-            <div class="search-box">
-              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
-              <input type="text" id="cheats-search-input" placeholder="Buscar cheat por jogo ou Title ID...">
-            </div>
+            <label class="search-box">
+              <svg><use href="#i-search"/></svg>
+              <span class="sr-only">Buscar cheats</span>
+              <input type="search" id="cheats-search-input" placeholder="Buscar cheat por jogo ou Title ID">
+            </label>
             <div class="toolbar-actions">
-              <button class="btn btn-outline" id="btn-open-converter">
-                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/></svg>
-                <span>Conversor de Região (CUSA)</span>
-              </button>
-              <button class="btn btn-primary" id="btn-new-cheat">
-                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 4v16m8-8H4"/></svg>
-                <span>Adicionar Cheat</span>
-              </button>
+              <button class="btn btn-outline" id="btn-open-converter"><svg><use href="#i-swap"/></svg><span>Conversor de região</span></button>
+              <button class="btn btn-primary" id="btn-new-cheat"><svg><use href="#i-plus"/></svg><span>Adicionar cheat</span></button>
             </div>
           </div>
-
-          <div class="cheats-list" id="cheats-container">
-            <!-- Dynamically injected -->
-          </div>
+          <div class="cheats-list" id="cheats-container"></div>
         </section>
 
-        <!-- ================= TAB: PKGs ================= -->
+        <!-- ============ PKGs ============ -->
         <section class="tab-pane" id="pane-pkgs">
           <div class="card p-4">
             <div class="pkg-header-banner">
               <div>
-                <h2>Pacotes em <code>/data/pkg/</code></h2>
-                <p>Estes arquivos podem ser instalados através do <strong>Package Installer</strong> do GoldHEN ou pelo <strong>PS4-Xplorer</strong>.</p>
+                <h2>No PS4 · <code>/data/pkg/</code></h2>
+                <p>Instale pelo <strong>Package Installer</strong> do GoldHEN (Debug Settings) ou por um gerenciador como o PS4-Xplorer.</p>
               </div>
-              <button class="btn btn-primary" id="btn-upload-pkg-direct">
-                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
-                <span>Fazer Upload de PKG</span>
-              </button>
+              <button class="btn btn-primary" id="btn-upload-pkg-direct"><svg><use href="#i-upload"/></svg><span>Enviar PKG</span></button>
             </div>
-
-            <div class="pkg-grid" id="pkgs-container">
-              <!-- Dynamically injected -->
-            </div>
+            <div class="pkg-grid" id="pkgs-container"></div>
           </div>
 
-          <!-- PKGs NO PC (instalação direta via Remote Package Installer) -->
           <div class="card p-4 mt-4">
             <div class="pkg-header-banner">
               <div>
-                <h2>Instalar PKG direto do PC</h2>
-                <p>O PS4 baixa o pacote direto desta pasta do computador usando o <strong>Remote Package Installer</strong> — sem copiar para o HD antes e sem ocupar espaço em dobro.</p>
+                <h2>No PC · instalar pela rede</h2>
+                <p>O PS4 baixa o pacote direto desta pasta do computador com o <strong>Remote Package Installer</strong>, sem copiar antes e sem ocupar espaço em dobro.</p>
               </div>
-              <button class="btn btn-outline" id="btn-refresh-pcpkgs">
-                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
-                <span>Atualizar</span>
-              </button>
+              <button class="btn btn-outline" id="btn-refresh-pcpkgs"><svg><use href="#i-refresh"/></svg><span>Atualizar</span></button>
             </div>
-            <div id="pcpkgs-info" class="info-box mt-3"></div>
+            <div id="pcpkgs-info" class="info-box"></div>
             <div id="pc-rpi-progress"></div>
             <div class="pkg-grid mt-3" id="pcpkgs-container"></div>
           </div>
         </section>
 
-        <!-- ================= TAB: MÍDIA (CAPTURAS DE TELA & PRINTS) ================= -->
+        <!-- ============ CAPTURES ============ -->
         <section class="tab-pane" id="pane-media">
           <div class="section-header">
-            <div>
-              <h3>Galeria de Capturas de Tela do PS4</h3>
-              <p>Screenshots e prints tirados pelo botão Share diretamente no console</p>
+            <div class="section-title-wrap">
+              <h3>Capturas de tela</h3>
+              <p>Prints tirados com o botão Share, por jogo</p>
             </div>
-            <button class="btn btn-outline" id="btn-refresh-captures">
-              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
-              <span>Recarregar Capturas</span>
-            </button>
+            <button class="btn btn-outline" id="btn-refresh-captures"><svg><use href="#i-refresh"/></svg><span>Atualizar</span></button>
           </div>
-
-          <!-- GAME FILTER TABS -->
-          <div class="captures-game-selector" id="captures-game-selector">
-            <!-- Filter buttons injected dynamically -->
-          </div>
-
-          <!-- CAPTURES GRID -->
-          <div class="captures-grid" id="captures-container">
-            <!-- Dynamically injected -->
-          </div>
+          <div class="captures-game-selector" id="captures-game-selector" role="tablist" aria-label="Jogos com capturas"></div>
+          <div class="captures-grid" id="captures-container"></div>
         </section>
 
-        <!-- ================= TAB: PAYLOADS & AÇÕES ================= -->
+        <!-- ============ TOOLS ============ -->
         <section class="tab-pane" id="pane-tools">
           <div class="tools-grid">
-            
-            <!-- BACKUP APP.DB -->
-            <div class="card p-4 glow-cyan">
-              <div class="stat-header">
-                <h3 data-i18n="tool_backup_title">Backup de Emergência (app.db)</h3>
-                <span class="stat-icon cyan">
-                  <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
-                </span>
+
+            <!-- Notify -->
+            <div class="card tool-card">
+              <div class="card-head">
+                <div>
+                  <h3 data-i18n="tool_notify_title">Notificação na TV</h3>
+                  <p data-i18n="tool_notify_desc">Envie uma mensagem que aparece no canto da tela do PS4.</p>
+                </div>
+                <span class="stat-icon"><svg><use href="#i-bell"/></svg></span>
               </div>
-              <p data-i18n="tool_backup_desc">Baixe uma cópia de segurança imediata da base de dados de jogos e aplicativos do PS4 (<code>/system_data/priv/mms/app.db</code>). Essencial para restaurar sua biblioteca caso corrompa!</p>
-              
-              <a href="/api/backup/appdb" class="btn btn-primary mt-3" style="text-decoration: none; display: inline-flex; align-items: center; gap: 8px;">
-                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4m4-5l5 5 5-5m-5 5V3"/></svg>
-                <span data-i18n="tool_backup_btn">Baixar Backup do app.db (.db)</span>
-              </a>
+              <div class="form-group">
+                <label for="notify-msg-input">Mensagem</label>
+                <input type="text" id="notify-msg-input" maxlength="400" data-i18n-ph="tool_notify_ph" placeholder="Ex: Pizza chegou!" value="Olá do Orbis Web Manager!">
+              </div>
+              <div class="row">
+                <button class="btn btn-primary" id="btn-send-notify"><svg><use href="#i-send"/></svg><span data-i18n="tool_notify_btn">Enviar para a TV</span></button>
+                <button class="btn btn-outline" id="btn-load-ps4debug" title="Baixa o ps4debug oficial (GoldHEN/ps4debug no GitHub) e envia para o BinLoader"><svg><use href="#i-download"/></svg><span>Carregar ps4debug</span></button>
+              </div>
+              <div class="info-box">
+                Requer o payload <strong>ps4debug</strong> rodando no PS4 (porta 744). Clique em <em>Carregar ps4debug</em>: o app baixa a versão oficial do GoldHEN e envia pelo BinLoader (porta 9090). Precisa ser feito <strong>uma vez a cada vez que o PS4 liga</strong>.
+              </div>
             </div>
 
-            <!-- NOTIFY TV -->
-            <div class="card p-4 glow-blue">
-              <div class="stat-header">
-                <h3 data-i18n="tool_notify_title">Notificação na Tela da TV (Notify OSD)</h3>
-                <span class="stat-icon blue">
-                  <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>
-                </span>
+            <!-- Ports -->
+            <div class="card tool-card" id="card-ports">
+              <div class="card-head">
+                <div>
+                  <h3>Diagnóstico de portas</h3>
+                  <p>Quais serviços do console estão respondendo agora.</p>
+                </div>
+                <span class="stat-icon"><svg><use href="#i-pulse"/></svg></span>
               </div>
-              <p data-i18n="tool_notify_desc">Envie uma mensagem em tempo real para pipocar no canto da tela do PlayStation 4 enquanto estiver jogando ou navegando na dashboard.</p>
-
-              <div class="form-group mt-3">
-                <input type="text" id="notify-msg-input" maxlength="400" data-i18n-ph="tool_notify_ph" placeholder="Ex: Pizza chegou! / Backup concluído" value="Olá do Orbis Web Manager!">
-              </div>
-
-              <div class="info-box mt-3">
-                <strong>Requisito no PS4: payload <code>ps4debug</code> carregado (porta 744).</strong><br>
-                O GoldHEN não tem um comando de notificação próprio na rede — a porta 9090 (BinLoader) só aceita payloads, não texto.
-                Carregue o <em>ps4debug</em> uma vez por boot: pelo menu <em>GoldHEN &gt; Payloads</em> (se a sua versão tiver) ou enviando o arquivo <code>ps4debug.bin</code> no card <strong>Injeção de Payload</strong> abaixo.
-              </div>
-
-              <button class="btn btn-primary mt-3" id="btn-send-notify">
-                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-                <span data-i18n="tool_notify_btn">Enviar Notificação para a TV</span>
-              </button>
+              <div id="ports-result" class="ports-list"></div>
+              <button class="btn btn-outline" id="btn-test-ports"><svg><use href="#i-refresh"/></svg><span>Testar portas</span></button>
             </div>
 
-            <!-- REMOTE PACKAGE INSTALLER (RPI) -->
-            <div class="card p-4">
-              <div class="stat-header">
-                <h3 data-i18n="tool_rpi_title">Instalador Remoto de Pacotes (GoldHEN RPI)</h3>
-                <span class="stat-icon yellow">
-                  <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
-                </span>
+            <!-- Payload -->
+            <div class="card tool-card">
+              <div class="card-head">
+                <div>
+                  <h3 data-i18n="tool_payload_title">Injeção de Payload (.bin)</h3>
+                  <p data-i18n="tool_payload_desc">Envie um payload para o BinLoader do GoldHEN (porta 9090).</p>
+                </div>
+                <span class="stat-icon"><svg><use href="#i-bolt"/></svg></span>
               </div>
-              <p data-i18n="tool_rpi_desc">Mande o PS4 instalar pacotes (.pkg) direto via rede HTTP (Porta 12800) em segundo plano, sem ocupar o dobro de espaço no HD.</p>
-              <p class="text-muted text-sm mt-2">Requer o app <strong>Remote Package Installer</strong> (flatz) aberto no PS4. Para instalar arquivos do seu PC, use a aba <a href="#" data-tab-trigger="pkgs" class="link">Pacotes (PKG)</a>.</p>
-
-              <div class="form-group mt-3">
-                <input type="url" id="rpi-pkg-url" placeholder="http://192.168.18.x:8080/jogo.pkg">
+              <div class="form-group">
+                <label for="payload-file-input" data-i18n="tool_payload_file_label">Arquivo de payload (.bin)</label>
+                <input type="file" id="payload-file-input" accept=".bin,.elf">
               </div>
-
-              <button class="btn btn-outline mt-3" id="btn-trigger-rpi">
-                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-                <span data-i18n="tool_rpi_btn">Disparar Instalação no PS4 (RPI)</span>
-              </button>
-              <div id="rpi-progress" class="mt-3"></div>
+              <button class="btn btn-primary" id="btn-send-payload"><svg><use href="#i-send"/></svg><span data-i18n="tool_payload_btn">Enviar payload</span></button>
             </div>
 
-            <!-- PORT DIAGNOSTICS -->
-            <div class="card p-4 glow-purple" id="card-ports">
-              <div class="stat-header">
-                <h3>Diagnóstico de Portas</h3>
-                <span class="stat-icon purple">
-                  <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
-                </span>
+            <!-- RPI -->
+            <div class="card tool-card">
+              <div class="card-head">
+                <div>
+                  <h3 data-i18n="tool_rpi_title">Instalar PKG por URL</h3>
+                  <p data-i18n="tool_rpi_desc">O PS4 baixa e instala o pacote pela rede (porta 12800).</p>
+                </div>
+                <span class="stat-icon"><svg><use href="#i-package"/></svg></span>
               </div>
-              <p>Verifica quais serviços do console estão respondendo agora. Se algo não funciona, comece por aqui.</p>
-              <div id="ports-result" class="ports-list mt-3"></div>
-              <button class="btn btn-outline mt-3" id="btn-test-ports">
-                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
-                <span>Testar Portas</span>
-              </button>
+              <p class="text-sm">Requer o app <strong>Remote Package Installer</strong> aberto no PS4. Para arquivos do seu PC, use <a href="#" data-tab-trigger="pkgs" class="link">Pacotes</a>.</p>
+              <div class="form-group">
+                <label for="rpi-pkg-url">URL do .pkg</label>
+                <input type="url" id="rpi-pkg-url" placeholder="http://192.168.0.10:8080/jogo.pkg">
+              </div>
+              <button class="btn btn-outline" id="btn-trigger-rpi"><svg><use href="#i-play"/></svg><span data-i18n="tool_rpi_btn">Instalar no PS4</span></button>
+              <div id="rpi-progress"></div>
             </div>
 
-            <!-- INJEÇÃO DE PAYLOAD -->
-            <div class="card p-4">
-              <h3 data-i18n="tool_payload_title">Injeção de Payload (.bin)</h3>
-              <p data-i18n="tool_payload_desc">Envie arquivos de payload compilados diretamente para a porta <strong>9090</strong> (BinLoader Server do GoldHEN).</p>
-              
-              <div class="form-group mt-3">
-                <label data-i18n="tool_payload_file_label">Arquivo de Payload (.bin)</label>
-                <input type="file" id="payload-file-input" accept=".bin">
+            <!-- Backup -->
+            <div class="card tool-card">
+              <div class="card-head">
+                <div>
+                  <h3 data-i18n="tool_backup_title">Backup do app.db</h3>
+                  <p data-i18n="tool_backup_desc">Cópia de segurança do banco de jogos do PS4. Essencial caso a biblioteca corrompa.</p>
+                </div>
+                <span class="stat-icon"><svg><use href="#i-save"/></svg></span>
               </div>
-
-              <button class="btn btn-primary mt-3" id="btn-send-payload">
-                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
-                <span data-i18n="tool_payload_btn">Enviar Payload para o PS4</span>
-              </button>
+              <a href="/api/backup/appdb" class="btn btn-outline"><svg><use href="#i-download"/></svg><span data-i18n="tool_backup_btn">Baixar backup</span></a>
             </div>
 
-            <!-- SMARTPHONE ACCESS -->
-            <div class="card p-4">
-              <h3 data-i18n="tool_phone_title">Conectar no Smartphone</h3>
-              <p data-i18n="tool_phone_desc">Acesse o painel direto pelo navegador do seu celular (Chrome, Safari, etc.) na mesma rede Wi-Fi.</p>
-              
+            <!-- Phone -->
+            <div class="card tool-card">
+              <div class="card-head">
+                <div>
+                  <h3 data-i18n="tool_phone_title">Abrir no celular</h3>
+                  <p data-i18n="tool_phone_desc">Use o painel no navegador do celular, na mesma rede Wi-Fi.</p>
+                </div>
+                <span class="stat-icon"><svg><use href="#i-phone"/></svg></span>
+              </div>
               <div class="mobile-connection-box">
                 <div class="network-badge">
-                  <span class="label" data-i18n="tool_phone_addr">Endereço de Acesso Móvel:</span>
-                  <code id="mobile-url-display">http://...:5000</code>
+                  <span class="label" data-i18n="tool_phone_addr">Endereço:</span>
+                  <code id="mobile-url-display">http://…:5000</code>
                 </div>
-                <div class="warn-box lan-warning" style="display:none;">
-                  O acesso pela rede está desativado. Feche o programa, execute <code>liberar-rede.bat</code> uma vez (pede administrador) e abra de novo.
-                </div>
-                <div id="qr-container" class="qr-box">
-                  <!-- QR Code rendered via JS or SVG -->
+                <div id="qr-container" class="qr-box"></div>
+                <div class="warn-box lan-warning" hidden>
+                  O acesso pela rede está desativado. Feche o programa, execute <code>liberar-rede.bat</code> uma vez e abra de novo.
                 </div>
               </div>
             </div>
           </div>
         </section>
 
-        <!-- ================= TAB: CONFIGURAÇÕES ================= -->
+        <!-- ============ SETTINGS ============ -->
         <section class="tab-pane" id="pane-settings">
-          <div class="card p-4 max-w-lg">
-            <h3 data-i18n="settings_title">Configurações de Conexão com o PlayStation 4</h3>
-            <p data-i18n="settings_sub">Ajuste o IP e as portas de rede do console.</p>
+          <div class="settings-layout">
+            <form id="settings-form" class="card settings-card" novalidate>
+              <h3 data-i18n="settings_title">Conexão com o PlayStation 4</h3>
+              <p class="text-sm mb-3" data-i18n="settings_sub">IP e portas do console.</p>
 
-            <form id="settings-form" class="mt-4">
+              <div class="form-section-title">Console</div>
               <div class="form-group">
-                <label data-i18n="settings_ip">Endereço de IP do PS4</label>
-                <input type="text" id="cfg-ps4-ip" required value="192.168.18.54" placeholder="ex: 192.168.18.54">
+                <label for="cfg-ps4-ip" data-i18n="settings_ip">Endereço IP do PS4</label>
+                <input type="text" id="cfg-ps4-ip" required inputmode="decimal" placeholder="ex: 192.168.0.50">
+                <small>No PS4: Configurações › Rede › Ver status da conexão.</small>
               </div>
-
               <div class="form-row mt-3">
                 <div class="form-group col">
-                  <label data-i18n="settings_ftp">Porta FTP (GoldHEN)</label>
+                  <label for="cfg-ftp-port" data-i18n="settings_ftp">Porta FTP (GoldHEN)</label>
                   <input type="number" id="cfg-ftp-port" required value="2121">
                 </div>
                 <div class="form-group col">
-                  <label data-i18n="settings_payload">Porta Payload (BinLoader)</label>
+                  <label for="cfg-payload-port" data-i18n="settings_payload">Porta BinLoader</label>
                   <input type="number" id="cfg-payload-port" required value="9090">
                 </div>
               </div>
-
               <div class="form-row mt-3">
                 <div class="form-group col">
-                  <label data-i18n="settings_fw">Versão do Firmware do PS4 (FW)</label>
-                  <input type="text" id="cfg-ps4-fw" value="9.00" placeholder="ex: 9.00, 11.00, 9.60">
+                  <label for="cfg-ps4-fw" data-i18n="settings_fw">Firmware (FW)</label>
+                  <input type="text" id="cfg-ps4-fw" placeholder="ex: 9.00, 11.00">
                 </div>
                 <div class="form-group col">
-                  <label data-i18n="settings_active_user">Perfil de Usuário Ativo</label>
+                  <label for="cfg-active-user" data-i18n="settings_active_user">Perfil de usuário</label>
                   <select id="cfg-active-user">
-                    <option value="" data-i18n="settings_user_auto">Auto-detectar (Mais Recente)</option>
+                    <option value="" data-i18n="settings_user_auto">Auto-detectar (mais recente)</option>
                   </select>
                 </div>
               </div>
 
-              <div class="form-group mt-3">
-                <label data-i18n="settings_sgdb_key">Chave de API do SteamGridDB (Opcional)</label>
-                <input type="password" id="cfg-sgdb-key" autocomplete="off" placeholder="Insira sua chave para liberar pôsteres e capas da comunidade">
-                <small class="text-muted" style="display: block; margin-top: 4px;">
-                  <span id="sgdb-key-state"></span>
-                  Permite buscar e baixar milhares de capas da comunidade. 
-                  <a href="https://www.steamgriddb.com/profile/preferences/api" target="_blank" rel="noopener" style="color: var(--neon-cyan); text-decoration: underline;">
-                    Pegar chave gratuita no SteamGridDB
-                  </a>
-                </small>
+              <div class="form-section-title">Capas</div>
+              <div class="form-group">
+                <label for="cfg-sgdb-key" data-i18n="settings_sgdb_key">Chave de API do SteamGridDB (opcional)</label>
+                <input type="password" id="cfg-sgdb-key" autocomplete="off" placeholder="Cole sua chave para liberar capas da comunidade">
+                <small><span id="sgdb-key-state"></span><a href="https://www.steamgriddb.com/profile/preferences/api" target="_blank" rel="noopener" class="link">Pegar chave gratuita no SteamGridDB</a></small>
               </div>
 
-              <div class="form-group mt-3">
-                <label>Pasta de PKGs no PC (para instalar pela rede)</label>
+              <div class="form-section-title">Instalação pela rede</div>
+              <div class="form-group">
+                <label for="cfg-pc-pkg-folder">Pasta de PKGs no PC</label>
                 <input type="text" id="cfg-pc-pkg-folder" placeholder="ex: D:\PS4\PKGs">
-                <small class="text-muted" style="display: block; margin-top: 4px;">Os .pkg desta pasta aparecem na aba Pacotes e podem ser instalados no PS4 sem copiar antes.</small>
+                <small>Os .pkg desta pasta aparecem em Pacotes e podem ser instalados no PS4 sem copiar antes.</small>
               </div>
 
-              <button type="submit" class="btn btn-primary mt-4">
-                <span data-i18n="settings_save">Salvar Configurações</span>
-              </button>
+              <div class="form-actions">
+                <button type="submit" class="btn btn-primary"><svg><use href="#i-save"/></svg><span data-i18n="settings_save">Salvar</span></button>
+              </div>
             </form>
+
+            <aside class="card settings-help">
+              <h3>Primeiros passos</h3>
+              <ol>
+                <li>Ligue o PS4 e ative o <strong>GoldHEN</strong>.</li>
+                <li>No menu do GoldHEN, deixe <strong>FTP Server</strong> e <strong>BinLoader Server</strong> ativos.</li>
+                <li>Informe o IP do PS4 ao lado e salve.</li>
+                <li>Volte ao Dashboard e clique em <strong>Verificar</strong> para ver o que está funcionando.</li>
+                <li>Para notificações na TV, use <strong>Carregar ps4debug</strong> em Payloads &amp; Ações.</li>
+              </ol>
+              <div class="warn-box mt-3">
+                <strong>Lento?</strong> O FTP do PS4 é muito sensível a perda de pacotes. Prefira cabo de rede no console ou Wi-Fi 5 GHz.
+              </div>
+            </aside>
           </div>
         </section>
 
-        <!-- ================= TAB: APOIAR PROJETO (DOAÇÕES) ================= -->
+        <!-- ============ DONATE ============ -->
         <section class="tab-pane" id="pane-donate">
           <div class="donate-container">
-            <div class="donate-header text-center mb-4">
-              <h2 data-i18n="donate_main_title">Apoie o Desenvolvimento do Orbis Web Manager ❤️</h2>
-              <p data-i18n="donate_main_desc">O Orbis Web Manager é um projeto 100% gratuito e open-source para a comunidade PlayStation 4 Jailbreak. Sua contribuição fortalece e acelera novas funções!</p>
+            <div class="donate-header">
+              <h2 data-i18n="donate_main_title">Apoie o Orbis Web Manager</h2>
+              <p data-i18n="donate_main_desc">Projeto gratuito e open-source para a comunidade PS4. Sua contribuição acelera novas funções!</p>
             </div>
-
             <div class="donate-grid">
-              <!-- PIX CARD -->
-              <div class="card donate-card glow-cyan">
-                <div class="donate-badge" data-i18n="donate_pix_badge">Brasil • Pix Instantâneo</div>
-                <div class="donate-icon pix-icon">
-                  <svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
-                </div>
+              <div class="card donate-card">
+                <span class="donate-badge" data-i18n="donate_pix_badge">Brasil • Pix</span>
                 <h3 data-i18n="donate_pix_title">Doação via Pix</h3>
-                <p class="donate-desc" data-i18n="donate_pix_desc">Escaneie o QR Code abaixo com o aplicativo do seu banco ou use a chave aleatória:</p>
-                
+                <p class="donate-desc" data-i18n="donate_pix_desc">Escaneie o QR Code com o app do banco ou copie a chave:</p>
                 <div class="pix-qr-wrap">
-                  <img src="https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=94af8068-d112-4c69-bcfa-8789b233246e" alt="QR Code Pix" class="pix-qr-img" id="pix-qr-code">
+                  <img src="https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=94af8068-d112-4c69-bcfa-8789b233246e" alt="QR Code Pix" class="pix-qr-img" id="pix-qr-code" loading="lazy">
                 </div>
-
                 <div class="pix-key-box">
-                  <span class="pix-key-label" data-i18n="donate_pix_key_label">Chave Aleatória:</span>
+                  <span class="pix-key-label" data-i18n="donate_pix_key_label">Chave aleatória</span>
                   <code class="pix-key-text" id="pix-key-value">94af8068-d112-4c69-bcfa-8789b233246e</code>
                 </div>
-
-                <button class="btn btn-primary w-full mt-3" id="btn-copy-pix">
-                  <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
-                  <span data-i18n="donate_pix_copy_btn">Copiar Chave Pix</span>
-                </button>
+                <button class="btn btn-primary w-full" id="btn-copy-pix"><svg><use href="#i-copy"/></svg><span data-i18n="donate_pix_copy_btn">Copiar chave Pix</span></button>
               </div>
-
-              <!-- BUY ME A COFFEE CARD -->
-              <div class="card donate-card glow-blue">
-                <div class="donate-badge" data-i18n="donate_bmac_badge">Internacional</div>
-                <div class="donate-icon coffee-icon">
-                  <svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8h1a4 4 0 010 8h-1M2 8h16v9a4 4 0 01-4 4H6a4 4 0 01-4-4V8zM6 1v3M10 1v3M14 1v3"/></svg>
-                </div>
+              <div class="card donate-card">
+                <span class="donate-badge" data-i18n="donate_bmac_badge">Internacional</span>
                 <h3 data-i18n="donate_bmac_title">Buy Me a Coffee</h3>
-                <p class="donate-desc" data-i18n="donate_bmac_desc">Apoie com um café para impulsionar novos recursos, cheats atualizados e compatibilidade contínua:</p>
-
+                <p class="donate-desc" data-i18n="donate_bmac_desc">Apoie com um café para impulsionar novos recursos:</p>
                 <div class="coffee-box">
-                  <div class="coffee-cup-graphic">☕</div>
-                  <div class="coffee-meta">
-                    <strong data-i18n="donate_bmac_strong">Apoio Internacional</strong>
+                  <span class="coffee-cup-graphic" aria-hidden="true">☕</span>
+                  <span class="coffee-meta">
+                    <strong data-i18n="donate_bmac_strong">Apoio internacional</strong>
                     <span data-i18n="donate_bmac_methods">Cartão, PayPal, Apple Pay</span>
-                  </div>
+                  </span>
                 </div>
-
-                <a href="https://buymeacoffee.com/kromossomoc" target="_blank" rel="noopener noreferrer" class="btn btn-warning w-full mt-3" id="btn-bmac">
-                  <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8h1a4 4 0 010 8h-1M2 8h16v9a4 4 0 01-4 4H6a4 4 0 01-4-4V8z"/></svg>
-                  <span data-i18n="donate_bmac_btn">Página Buy Me a Coffee</span>
-                </a>
+                <a href="https://buymeacoffee.com/kromossomoc" target="_blank" rel="noopener noreferrer" class="btn btn-warning w-full" id="btn-bmac"><span data-i18n="donate_bmac_btn">Página Buy Me a Coffee</span></a>
               </div>
             </div>
-
-            <!-- COMMUNITY CARD -->
-            <div class="card p-4 mt-4 text-center">
-              <h3 data-i18n="donate_community_title">Participe da Comunidade Open Source</h3>
-              <p data-i18n="donate_community_desc">Deixe uma ⭐ estrela no repositório GitHub para aumentar a visibilidade do projeto na cena PlayStation 4!</p>
-              <div class="mt-3" style="display: flex; gap: 12px; justify-content: center; flex-wrap: wrap;">
-                <a href="https://github.com/kromossomom-debug/orbis-web-manager" target="_blank" rel="noopener noreferrer" class="btn btn-outline">
-                  <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
-                  <span data-i18n="donate_github_btn">Ver Repositório no GitHub</span>
-                </a>
-              </div>
+            <div class="card donate-community">
+              <h3 data-i18n="donate_community_title">Comunidade open source</h3>
+              <p data-i18n="donate_community_desc">Deixe uma estrela no GitHub para dar visibilidade ao projeto!</p>
+              <a href="https://github.com/kromossomom-debug/orbis-web-manager" target="_blank" rel="noopener noreferrer" class="btn btn-outline"><svg><use href="#i-star"/></svg><span data-i18n="donate_github_btn">Ver no GitHub</span></a>
             </div>
           </div>
         </section>
@@ -684,49 +612,29 @@
       </div>
     </main>
 
-    <!-- MOBILE BOTTOM NAVIGATION -->
-    <nav class="mobile-bottom-nav">
-      <button class="mobile-nav-item active" data-tab="dashboard">
-        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
-        <span>Painel</span>
-      </button>
-      <button class="mobile-nav-item" data-tab="games">
-        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 12h4m-2-2v4m10-2h.01m-3 0h.01"/></svg>
-        <span>Jogos</span>
-      </button>
-      <button class="mobile-nav-item" data-tab="files">
-        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/></svg>
-        <span>Arquivos</span>
-      </button>
-      <button class="mobile-nav-item" data-tab="cheats">
-        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
-        <span>Cheats</span>
-      </button>
-      <button class="mobile-nav-item" data-tab="media">
-        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
-        <span>Capturas</span>
-      </button>
+    <!-- ============ MOBILE BOTTOM NAV ============ -->
+    <nav class="mobile-bottom-nav" aria-label="Navegação">
+      <button class="mobile-nav-item active" data-tab="dashboard"><svg><use href="#i-home"/></svg><span>Início</span></button>
+      <button class="mobile-nav-item" data-tab="games"><svg><use href="#i-games"/></svg><span>Jogos</span></button>
+      <button class="mobile-nav-item" data-tab="files"><svg><use href="#i-folder"/></svg><span>Arquivos</span></button>
+      <button class="mobile-nav-item" data-tab="tools"><svg><use href="#i-tool"/></svg><span>Ações</span></button>
+      <button class="mobile-nav-item" id="mobile-more" aria-label="Mais opções" aria-controls="sidebar"><svg><use href="#i-more"/></svg><span>Mais</span></button>
     </nav>
-
   </div>
 
   <!-- ================= MODALS ================= -->
 
-  <!-- MODAL: UPLOAD PROGRESS -->
-  <div class="modal-overlay" id="modal-upload">
-    <div class="modal-card">
+  <div class="modal-overlay" id="modal-upload" role="dialog" aria-modal="true" aria-labelledby="upload-modal-title">
+    <div class="modal-card" tabindex="-1">
       <div class="modal-header">
-        <h3 id="upload-modal-title">Enviando Arquivo para o PS4...</h3>
-        <button class="modal-close" id="upload-modal-close">&times;</button>
+        <h3 id="upload-modal-title">Enviando para o PS4…</h3>
       </div>
       <div class="modal-body">
         <div class="file-meta-box">
-          <span class="file-name" id="upload-file-name">Nome do arquivo</span>
+          <span class="file-name" id="upload-file-name">arquivo</span>
           <span class="file-size" id="upload-file-size">0 MB</span>
         </div>
-        <div class="progress-bar-wrap">
-          <div class="progress-bar" id="upload-progress-fill" style="width: 0%"></div>
-        </div>
+        <div class="progress-bar-wrap"><div class="progress-bar" id="upload-progress-fill" style="width: 0%"></div></div>
         <div class="progress-stats">
           <span id="upload-percent">0%</span>
           <span id="upload-dest">Destino: /data/</span>
@@ -735,52 +643,42 @@
     </div>
   </div>
 
-  <!-- MODAL: REGION CONVERTER (CUSA) -->
-  <div class="modal-overlay" id="modal-converter">
-    <div class="modal-card">
+  <div class="modal-overlay" id="modal-converter" role="dialog" aria-modal="true" aria-labelledby="converter-title">
+    <div class="modal-card" tabindex="-1">
       <div class="modal-header">
-        <h3>Conversor de Região de Cheat (CUSA)</h3>
-        <button class="modal-close" id="converter-modal-close">&times;</button>
+        <h3 id="converter-title">Conversor de região (CUSA)</h3>
+        <button class="modal-close" aria-label="Fechar">&times;</button>
       </div>
       <div class="modal-body">
-        <p class="modal-desc">
-          Converte um arquivo de cheat de outra região (ex: Americana <code>CUSA00242</code>) para o Title ID da sua versão instalada (ex: Brasileira <code>CUSA00243</code>) e já envia automaticamente para o PS4.
-        </p>
-
+        <p class="modal-desc">Adapta um cheat de outra região (ex: americana <code>CUSA00242</code>) para o Title ID da sua versão (ex: brasileira <code>CUSA00243</code>) e já envia para o PS4.</p>
         <div class="form-group mt-3">
-          <label>Carregar Arquivo Cheat Original (.json)</label>
+          <label for="converter-file-input">Arquivo do cheat original (.json)</label>
           <input type="file" id="converter-file-input" accept=".json">
         </div>
-
         <div class="form-row mt-3">
           <div class="form-group col">
-            <label>Title ID Original</label>
+            <label for="converter-source-id">Title ID original</label>
             <input type="text" id="converter-source-id" placeholder="CUSA00242" value="CUSA00242">
           </div>
           <div class="form-group col">
-            <label>Seu Title ID Destino</label>
+            <label for="converter-target-id">Seu Title ID</label>
             <input type="text" id="converter-target-id" placeholder="CUSA00243" value="CUSA00243">
           </div>
         </div>
-
         <div class="form-group mt-3">
-          <label>Versão do Jogo (ex: 01.47)</label>
+          <label for="converter-version">Versão do jogo</label>
           <input type="text" id="converter-version" placeholder="01.47" value="01.47">
         </div>
-
-        <button class="btn btn-primary mt-4 w-full" id="btn-run-convert">
-          <span>Converter e Enviar para o PS4</span>
-        </button>
+        <button class="btn btn-primary w-full mt-4" id="btn-run-convert">Converter e enviar</button>
       </div>
     </div>
   </div>
 
-  <!-- MODAL: CHEAT VIEWER -->
-  <div class="modal-overlay" id="modal-cheat-view">
-    <div class="modal-card large">
+  <div class="modal-overlay" id="modal-cheat-view" role="dialog" aria-modal="true" aria-labelledby="cheat-view-title">
+    <div class="modal-card large" tabindex="-1">
       <div class="modal-header">
-        <h3 id="cheat-view-title">Detalhes do Cheat</h3>
-        <button class="modal-close" id="cheat-view-close">&times;</button>
+        <h3 id="cheat-view-title">Cheat</h3>
+        <button class="modal-close" aria-label="Fechar">&times;</button>
       </div>
       <div class="modal-body">
         <div class="cheat-meta-row" id="cheat-view-meta"></div>
@@ -789,187 +687,164 @@
     </div>
   </div>
 
-  <!-- MODAL: LIGHTBOX CAPTURE VIEWER -->
-  <div class="modal-overlay" id="modal-lightbox">
-    <div class="modal-card large" style="max-width: 900px; background: #000;">
-      <div class="modal-header" style="border-bottom: 1px solid rgba(255,255,255,0.1);">
-        <h3 id="lightbox-title">Captura de Tela</h3>
-        <div style="display: flex; gap: 8px;">
-          <a id="lightbox-download-btn" href="#" download class="btn btn-sm btn-primary">Baixar Foto</a>
-          <button class="modal-close" id="lightbox-close">&times;</button>
+  <div class="modal-overlay modal-lightbox" id="modal-lightbox" role="dialog" aria-modal="true" aria-labelledby="lightbox-title">
+    <div class="modal-card large" tabindex="-1">
+      <div class="modal-header">
+        <h3 id="lightbox-title" class="mono text-sm">Captura</h3>
+        <div class="row">
+          <a id="lightbox-download-btn" href="#" download class="btn btn-sm btn-primary"><svg><use href="#i-download"/></svg>Baixar</a>
+          <button class="modal-close" aria-label="Fechar">&times;</button>
         </div>
       </div>
-      <div class="modal-body p-0 text-center" style="background: #000; display: flex; align-items: center; justify-content: center; min-height: 400px;">
-        <img id="lightbox-img" src="" alt="Screenshot" style="max-width: 100%; max-height: 75vh; object-fit: contain;">
-      </div>
+      <div class="modal-body"><img id="lightbox-img" src="" alt="Captura de tela"></div>
     </div>
   </div>
 
-  <!-- MODAL: QR CODE MOBILE -->
-  <div class="modal-overlay" id="modal-qr">
-    <div class="modal-card">
+  <div class="modal-overlay" id="modal-qr" role="dialog" aria-modal="true" aria-labelledby="qr-title">
+    <div class="modal-card" tabindex="-1">
       <div class="modal-header">
-        <h3>Acesse pelo Smartphone</h3>
-        <button class="modal-close" id="modal-qr-close">&times;</button>
+        <h3 id="qr-title">Abrir no celular</h3>
+        <button class="modal-close" aria-label="Fechar">&times;</button>
       </div>
       <div class="modal-body text-center">
-        <p>Aponte a câmera do seu celular para o QR Code abaixo para abrir o painel:</p>
+        <p>Aponte a câmera do celular para o QR Code:</p>
         <div id="modal-qr-target" class="qr-render-box"></div>
-        <div class="mt-3">
-          <code id="modal-qr-url" class="qr-url-text">http://localhost:5000</code>
-        </div>
+        <div class="mt-3"><code id="modal-qr-url" class="qr-url-text">http://localhost:5000</code></div>
       </div>
     </div>
   </div>
 
-  <!-- MODAL: DETALHES DO JOGO -->
-  <div class="modal-overlay" id="modal-game">
-    <div class="modal-card large">
+  <div class="modal-overlay" id="modal-game" role="dialog" aria-modal="true" aria-labelledby="gd-title">
+    <div class="modal-card large" tabindex="-1">
       <div class="modal-header">
         <div class="game-detail-head">
           <img id="gd-icon" src="" alt="">
           <div>
             <h3 id="gd-title">Jogo</h3>
-            <p class="text-muted text-sm" id="gd-sub"></p>
+            <p id="gd-sub"></p>
           </div>
         </div>
-        <button class="modal-close" onclick="closeModal('modal-game')">&times;</button>
+        <button class="modal-close" aria-label="Fechar">&times;</button>
       </div>
       <div class="modal-body">
         <div class="gd-stats" id="gd-stats"></div>
         <div class="gd-actions mt-3">
-          <button class="btn btn-primary btn-sm" id="gd-btn-cover">Trocar Capa</button>
-          <button class="btn btn-outline btn-sm" id="gd-btn-bg">Trocar Fundo (pic1)</button>
-          <button class="btn btn-outline btn-sm" id="gd-btn-restore" style="display:none;">Restaurar Capa Original</button>
-          <a class="btn btn-outline btn-sm" id="gd-btn-download" href="#" download>Baixar Capa Atual</a>
-          <button class="btn btn-outline btn-sm" id="gd-btn-files">Abrir Pasta no FTP</button>
+          <button class="btn btn-primary btn-sm" id="gd-btn-cover"><svg><use href="#i-image"/></svg>Trocar capa</button>
+          <button class="btn btn-outline btn-sm" id="gd-btn-bg">Trocar fundo</button>
+          <button class="btn btn-outline btn-sm" id="gd-btn-restore" hidden>Restaurar original</button>
+          <a class="btn btn-ghost btn-sm" id="gd-btn-download" href="#" download><svg><use href="#i-download"/></svg>Baixar capa</a>
+          <button class="btn btn-ghost btn-sm" id="gd-btn-files"><svg><use href="#i-folder"/></svg>Abrir pasta</button>
         </div>
         <div id="gd-cheats" class="mt-3"></div>
       </div>
     </div>
   </div>
 
-  <!-- MODAL: BUSCAR CAPAS ONLINE (SONY TMDB & STEAMGRIDDB) -->
-  <div class="modal-overlay" id="modal-cover-search">
-    <div class="modal-card large">
+  <div class="modal-overlay" id="modal-cover-search" role="dialog" aria-modal="true" aria-labelledby="modal-cover-title">
+    <div class="modal-card large" tabindex="-1">
       <div class="modal-header">
         <div>
-          <h3 id="modal-cover-title">Buscar Capas Online</h3>
-          <p class="text-muted text-sm" id="modal-cover-sub">Baixe artes oficiais da Sony ou da comunidade SteamGridDB</p>
+          <h3 id="modal-cover-title">Trocar arte</h3>
+          <p id="modal-cover-sub"></p>
         </div>
-        <button class="modal-close" onclick="closeModal('modal-cover-search')">&times;</button>
+        <button class="modal-close" aria-label="Fechar">&times;</button>
       </div>
-      <div class="modal-body" style="max-height: 70vh; overflow-y: auto;">
-        <!-- Target + fit -->
+      <div class="modal-body">
         <div class="cover-options">
-          <div class="seg" id="cover-target-seg">
-            <button class="seg-btn active" data-value="icon">Capa (ícone 512×512)</button>
-            <button class="seg-btn" data-value="background">Fundo (pic1 1920×1080)</button>
+          <div class="seg" id="cover-target-seg" role="group" aria-label="O que trocar">
+            <button class="seg-btn active" data-value="icon">Capa · 512×512</button>
+            <button class="seg-btn" data-value="background">Fundo · 1920×1080</button>
           </div>
-          <div class="seg" id="cover-fit-seg">
+          <div class="seg" id="cover-fit-seg" role="group" aria-label="Enquadramento">
             <button class="seg-btn active" data-value="cover" title="Preenche e corta as bordas">Preencher</button>
             <button class="seg-btn" data-value="contain" title="Mostra a imagem inteira com fundo desfocado">Imagem inteira</button>
           </div>
         </div>
 
-        <!-- Search Toolbar -->
-        <div class="form-row mt-3 mb-3" style="gap: 10px;">
-          <input type="text" id="cover-search-input" class="input" placeholder="Nome do jogo..." style="flex: 1;">
-          <button class="btn btn-primary" id="btn-cover-search-exec">
-            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
-            <span>Buscar</span>
-          </button>
+        <div class="form-row mt-3 mb-3">
+          <label class="search-box">
+            <svg><use href="#i-search"/></svg>
+            <span class="sr-only">Nome do jogo</span>
+            <input type="search" id="cover-search-input" placeholder="Nome do jogo">
+          </label>
+          <button class="btn btn-primary" id="btn-cover-search-exec">Buscar</button>
         </div>
 
-        <!-- Loading state -->
-        <div id="cover-search-loading" style="display: none; text-align: center; padding: 30px;">
+        <div id="cover-search-loading" class="loading-state" hidden>
           <div class="spinner"></div>
-          <p class="mt-2 text-muted">Buscando artes na Sony PlayStation e no SteamGridDB...</p>
+          <span>Buscando na PlayStation Store e no SteamGridDB…</span>
         </div>
 
-        <!-- Results Container -->
         <div id="cover-search-results">
-          <!-- Sony TMDB section -->
-          <div id="sony-cover-section" class="mb-4" style="display: none;">
-            <h4 class="section-mini-title" style="color: var(--neon-cyan);">Arte Oficial PlayStation (Sony)</h4>
+          <div id="sony-cover-section" class="mb-4" hidden>
+            <h4 class="section-mini-title">Arte oficial · PlayStation Store</h4>
             <div class="sony-row" id="sony-cover-row"></div>
           </div>
 
-          <!-- SteamGridDB section -->
           <div id="sgdb-cover-section">
-            <h4 class="section-mini-title" style="color: #b57cff; justify-content: space-between;">
-              <span>Artes da Comunidade (SteamGridDB)</span>
-              <span class="badge" id="sgdb-count-badge">0 encontradas</span>
+            <h4 class="section-mini-title">
+              <span>Comunidade · SteamGridDB</span>
+              <span class="badge" id="sgdb-count-badge">0</span>
             </h4>
-
-            <div id="sgdb-no-key-banner" class="info-box mb-3" style="display: none;">
-              Para liberar milhares de capas da comunidade, crie uma chave gratuita no SteamGridDB e cole em <strong>Configurações</strong>.
-              <a href="https://www.steamgriddb.com/profile/preferences/api" target="_blank" rel="noopener" class="link">Obter chave gratuita</a>
+            <div id="sgdb-no-key-banner" class="info-box mb-3" hidden>
+              Para liberar milhares de capas da comunidade, crie uma chave gratuita no SteamGridDB e cole em <a href="#" class="link" data-tab-trigger="settings">Configurações</a>.
             </div>
-
-            <div class="form-row mb-3" id="sgdb-filters" style="gap: 10px; display: none;">
-              <select id="sgdb-game-select" class="select-sm" style="flex: 2;" title="Jogo encontrado no SteamGridDB"></select>
-              <select id="sgdb-kind-select" class="select-sm" style="flex: 1;" title="Tipo de arte">
+            <div class="form-row mb-3" id="sgdb-filters" hidden>
+              <select id="sgdb-game-select" class="select-sm flex-1" aria-label="Jogo encontrado"></select>
+              <select id="sgdb-kind-select" class="select-sm" aria-label="Tipo de arte">
                 <option value="square">Quadradas (melhor p/ capa)</option>
                 <option value="all">Todas as grades</option>
                 <option value="heroes">Banners (melhor p/ fundo)</option>
               </select>
             </div>
-
             <div id="sgdb-grid-container" class="sgdb-grid"></div>
           </div>
         </div>
       </div>
       <div class="modal-footer">
-        <button class="btn btn-outline btn-sm" onclick="triggerLocalFileUpload()">
-          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4m17-5l-5-5m0 0l-5 5m5-5v12"/></svg>
-          <span>Enviar imagem do PC</span>
-        </button>
-        <span class="text-muted text-sm hide-mobile">O PS4 pode só mostrar a capa nova depois de reiniciar o console.</span>
-        <button class="btn btn-outline btn-sm" onclick="closeModal('modal-cover-search')">Fechar</button>
+        <button class="btn btn-outline btn-sm" onclick="triggerLocalFileUpload()"><svg><use href="#i-upload"/></svg>Usar imagem do PC</button>
+        <span class="text-muted text-xs hide-mobile">Pode ser preciso reiniciar o PS4 para ver a arte nova.</span>
       </div>
     </div>
   </div>
 
-  <!-- MODAL: PRÉ-VISUALIZAÇÃO DA CAPA -->
-  <div class="modal-overlay" id="modal-cover-preview">
-    <div class="modal-card">
+  <div class="modal-overlay" id="modal-cover-preview" role="dialog" aria-modal="true" aria-labelledby="cover-preview-title">
+    <div class="modal-card" tabindex="-1">
       <div class="modal-header">
-        <h3>Confirmar nova arte</h3>
-        <button class="modal-close" onclick="closeModal('modal-cover-preview')">&times;</button>
+        <h3 id="cover-preview-title">Confirmar nova arte</h3>
+        <button class="modal-close" aria-label="Fechar">&times;</button>
       </div>
       <div class="modal-body text-center">
-        <p class="text-muted text-sm mb-3" id="cover-preview-desc">Assim ficará no PS4:</p>
+        <p class="text-sm mb-3" id="cover-preview-desc">Assim ficará no PS4:</p>
         <div class="cover-preview-box"><img id="cover-preview-img" src="" alt="Pré-visualização"></div>
-        <p class="text-muted text-sm mt-3">A arte original é guardada no PC e pode ser restaurada a qualquer momento.</p>
-        <div class="form-row mt-3" style="gap: 10px; justify-content: center;">
-          <button class="btn btn-outline" onclick="closeModal('modal-cover-preview')">Cancelar</button>
-          <button class="btn btn-primary" id="btn-cover-confirm">Aplicar no PS4</button>
-        </div>
+        <p class="text-xs text-muted mt-3">A arte original fica guardada no PC e pode ser restaurada a qualquer momento.</p>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" onclick="closeModal('modal-cover-preview')">Cancelar</button>
+        <button class="btn btn-primary" id="btn-cover-confirm">Aplicar no PS4</button>
       </div>
     </div>
   </div>
 
-  <!-- HIDDEN GENERIC FILE INPUTS -->
-  <input type="file" id="generic-file-input" style="display: none;">
-  <input type="file" id="pkg-file-input" accept=".pkg" style="display: none;">
-  <input type="file" id="cheat-file-input" accept=".json" style="display: none;">
-  <input type="file" id="cover-file-input" accept="image/png, image/jpeg" style="display: none;">
+  <!-- Hidden file inputs -->
+  <input type="file" id="generic-file-input" hidden>
+  <input type="file" id="pkg-file-input" accept=".pkg" hidden>
+  <input type="file" id="cheat-file-input" accept=".json" hidden>
+  <input type="file" id="cover-file-input" accept="image/png, image/jpeg" hidden>
 
-  <!-- TOAST CONTAINER -->
-  <div class="toast-container" id="toast-container"></div>
+  <div class="toast-container" id="toast-container" aria-live="polite" aria-atomic="false"></div>
 
-  <!-- INTERACTIVE TUTORIAL OVERLAY & BALLOON -->
+  <!-- Tutorial -->
   <div class="tour-backdrop" id="tour-backdrop"></div>
-  <div class="tour-balloon" id="tour-balloon">
+  <div class="tour-balloon" id="tour-balloon" role="dialog" aria-labelledby="tour-title">
     <div class="tour-header">
       <div class="tour-step-badge" id="tour-step-badge">1 / 6</div>
-      <button class="tour-close-btn" id="tour-close-btn" title="Pular Tutorial">&times;</button>
+      <button class="tour-close-btn" id="tour-close-btn" aria-label="Pular tutorial">&times;</button>
     </div>
-    <h4 class="tour-title" id="tour-title">1. Conecte seu PlayStation 4</h4>
-    <p class="tour-desc" id="tour-desc">O primeiro passo é abrir a aba Configurações e colocar o endereço de IP do seu PS4 na rede.</p>
+    <h4 class="tour-title" id="tour-title"></h4>
+    <p class="tour-desc" id="tour-desc"></p>
     <div class="tour-footer">
-      <button class="btn btn-sm btn-outline" id="tour-prev-btn">Anterior</button>
+      <button class="btn btn-sm btn-ghost" id="tour-prev-btn">Anterior</button>
       <div class="tour-dots" id="tour-dots"></div>
       <button class="btn btn-sm btn-primary" id="tour-next-btn">Próximo</button>
     </div>

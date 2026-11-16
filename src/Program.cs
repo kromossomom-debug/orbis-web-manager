@@ -563,6 +563,11 @@ namespace OrbisWebManager
                         }
                         return;
                     }
+                case "/api/system/ps4debug":
+                    if (!post) break;
+                    try { Http.Json(res, new { success = true, message = Ps4Services.LoadPs4Debug() }); }
+                    catch (Exception ex) { Http.Error(res, 409, ex.Message); }
+                    return;
                 case "/api/system/rpi":
                     if (!post) break;
                     {

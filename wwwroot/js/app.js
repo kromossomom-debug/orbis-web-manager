@@ -342,15 +342,35 @@ function initNavigation() {
     if (trg) {
       e.preventDefault();
       switchTab(trg.getAttribute('data-tab-trigger'));
-      if (trg.id === 'dash-port-payload') testPorts();
     }
     if (document.body.classList.contains('sidebar-open') && !e.target.closest('.sidebar') && !e.target.closest('#mobile-menu-toggle')) {
       document.body.classList.remove('sidebar-open');
     }
   });
 
-  const menuBtn = document.getElementById('mobile-menu-toggle');
-  if (menuBtn) menuBtn.addEventListener('click', () => document.body.classList.toggle('sidebar-open'));
+  ['mobile-menu-toggle', 'mobile-more'].forEach(id => {
+    const b = document.getElementById(id);
+    if (b) b.addEventListener('click', (e) => { e.stopPropagation(); document.body.classList.toggle('sidebar-open'); });
+  });
+
+  document.getElementById('dash-port-payload').addEventListener('click', runHealthCheck);
+  document.getElementById('btn-banner-retry').addEventListener('click', () => { fetchStatus(); fetchSummary(true); fetchGames('refresh'); });
+  if (!sessionStorage.getItem('owm_health_done')) setTimeout(runHealthCheck, 1500);
+
+  // Load ps4debug (needed for TV notifications)
+  document.getElementById('btn-load-ps4debug').addEventListener('click', async (e) => {
+    const btn = e.currentTarget;
+    btn.disabled = true;
+    showToast('Baixando o ps4debug oficial e enviando ao PS4…', 'info');
+    try {
+      const d = await postJson('/api/system/ps4debug', {}, { timeout: 60000 });
+      showToast(d.message, 'success', 7000);
+    } catch (err) {
+      showToast(err.message, 'error', 9000);
+    } finally {
+      btn.disabled = false;
+    }
+  });
 
   document.getElementById('action-upload-pkg').addEventListener('click', () => document.getElementById('pkg-file-input').click());
   document.getElementById('action-upload-cheat').addEventListener('click', () => document.getElementById('cheat-file-input').click());
@@ -467,7 +487,9 @@ function updateTabTitles(tabId) {
 function switchTab(tabId) {
   state.currentTab = tabId;
   document.querySelectorAll('.nav-item, .mobile-nav-item').forEach(el => {
-    el.classList.toggle('active', el.getAttribute('data-tab') === tabId);
+    const on = el.getAttribute('data-tab') === tabId;
+    el.classList.toggle('active', on);
+    if (on) el.setAttribute('aria-current', 'page'); else el.removeAttribute('aria-current');
   });
   document.querySelectorAll('.tab-pane').forEach(pane => {
     pane.classList.toggle('active', pane.id === `pane-${tabId}`);
@@ -483,6 +505,13 @@ function switchTab(tabId) {
 
 // ================= DELEGATED ACTIONS (dynamic lists) =================
 function initActions() {
+  // Keyboard support for card-like buttons (role="button")
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    const el = e.target.closest && e.target.closest('[role="button"][data-action]');
+    if (el && e.target === el) { e.preventDefault(); el.click(); }
+  });
+
   document.addEventListener('click', (e) => {
     const el = e.target.closest('[data-action]');
     if (!el) return;
@@ -508,34 +537,74 @@ function initActions() {
 
 // 1. Status (fast: ping + FTP keep-alive)
 async function fetchStatus() {
+  const setDots = (cls) => ['sidebar-dot', 'console-dot', 'ping-dot'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.className = `status-dot ${cls}`;
+  });
+  const banner = document.getElementById('conn-banner');
   try {
     const data = await api('/api/status', { timeout: 15000 });
     state.status = data;
+    const healthy = data.online && data.ftpOk;
 
-    const pingIndicator = document.getElementById('ping-indicator');
-    const pingVal = pingIndicator.querySelector('.ping-val');
-    if (data.online) {
-      pingVal.textContent = data.ping >= 0 ? `${data.ping} ms` : 'Online';
-      pingIndicator.style.borderColor = 'rgba(0, 230, 118, 0.4)';
-    } else {
-      pingVal.textContent = 'Offline';
-      pingIndicator.style.borderColor = 'rgba(255, 61, 113, 0.4)';
-    }
+    const pingVal = document.querySelector('#ping-indicator .ping-val');
+    pingVal.textContent = data.online ? (data.ping >= 0 ? `${data.ping} ms` : 'online') : 'offline';
+    setDots(healthy ? 'online' : (data.online ? 'warn' : 'offline'));
 
     document.getElementById('ip-display').textContent = `${data.ip}:${data.ftpPort}`;
-    const dashStatus = document.getElementById('dash-online-status');
-    dashStatus.textContent = data.online ? (data.ftpOk ? 'Online • Conectado' : 'Online • FTP desligado') : 'Console Desconectado';
-    dashStatus.style.color = data.online && data.ftpOk ? 'var(--accent-green)' : (data.online ? 'var(--accent-amber)' : 'var(--accent-red)');
+    document.getElementById('dash-online-status').textContent = healthy ? 'Conectado' : (data.online ? 'FTP do GoldHEN desligado' : 'Console desconectado');
+    document.getElementById('dash-banner').textContent = data.transfer ? `Transferindo: ${data.transfer}…` : `${data.ip} · ${data.banner || 'GoldHEN FTP Server'}`;
+    document.getElementById('dash-fw-badge').textContent = `FW ${data.fw || '?'} · ${data.goldhenVer || 'GoldHEN'}`;
+    document.getElementById('dash-port-ftp').textContent = data.ftpOk ? `FTP ${data.ftpPort}${data.ftpBusy ? ' · ocupado' : ''}` : `FTP ${data.ftpPort} · inativo`;
 
-    document.getElementById('dash-banner').textContent = data.transfer ? `⏳ ${data.transfer}...` : (data.banner || 'GoldHEN FTP Server');
-    const fwBadge = document.getElementById('dash-fw-badge');
-    if (fwBadge) fwBadge.textContent = `FW: ${data.fw || '?'} • ${data.goldhenVer || 'GoldHEN'}`;
-    document.getElementById('dash-port-ftp').textContent = data.ftpOk ? `FTP ${data.ftpPort}: ${data.ftpBusy ? 'Ocupado' : 'Ativo'}` : `FTP ${data.ftpPort}: Inativo`;
-
-    document.querySelectorAll('.lan-warning').forEach(el => el.style.display = data.lanAccess ? 'none' : 'block');
+    if (banner) {
+      banner.hidden = healthy;
+      if (!healthy) {
+        document.getElementById('conn-banner-title').textContent = data.online
+          ? 'O PS4 responde, mas o FTP do GoldHEN não'
+          : `Não foi possível falar com o PS4 em ${data.ip}`;
+        document.getElementById('conn-banner-text').textContent = data.online
+          ? 'No menu do GoldHEN, ative "FTP Server" (porta ' + data.ftpPort + ') e tente de novo.'
+          : 'Confira se o console está ligado com o GoldHEN ativo e se o IP em Configurações está correto.';
+      }
+    }
+    document.querySelectorAll('.lan-warning').forEach(el => el.hidden = !!data.lanAccess);
   } catch (err) {
-    const pingVal = document.querySelector('#ping-indicator .ping-val');
-    if (pingVal) pingVal.textContent = 'Sem servidor';
+    document.querySelector('#ping-indicator .ping-val').textContent = 'sem servidor';
+    setDots('offline');
+    if (banner) {
+      banner.hidden = false;
+      document.getElementById('conn-banner-title').textContent = 'O programa Orbis Web Manager não está respondendo';
+      document.getElementById('conn-banner-text').textContent = 'Verifique se a janela do OrbisManager (start.bat) ainda está aberta no PC.';
+    }
+  }
+}
+
+// Dashboard checklist: which console services work right now
+const HEALTH_INFO = {
+  2121: { label: 'Arquivos, jogos e capas', fix: 'Ative "FTP Server" no GoldHEN' },
+  9090: { label: 'Envio de payloads', fix: 'Ative "BinLoader Server" no GoldHEN (ou reinicie o PS4)' },
+  744: { label: 'Notificações na TV', fix: 'Use "Carregar ps4debug" em Payloads & Ações' },
+  12800: { label: 'Instalar PKG pela rede', fix: 'Abra o app Remote Package Installer no PS4' }
+};
+async function runHealthCheck() {
+  const box = document.getElementById('health-list');
+  if (!box) return;
+  box.innerHTML = `<div class="text-muted text-sm"><span class="spinner small"></span> Verificando…</div>`;
+  try {
+    const list = await api('/api/ports', { timeout: 20000 });
+    sessionStorage.setItem('owm_health_done', '1');
+    box.innerHTML = list.map(p => {
+      const info = HEALTH_INFO[p.port] || { label: p.name, fix: '' };
+      return `
+        <div class="health-item ${p.open ? 'ok' : 'bad'}">
+          <span class="status-dot"></span>
+          <span class="grow">${esc(info.label)}<small>${p.open ? esc(p.name) + ' · porta ' + p.port : esc(info.fix)}</small></span>
+          <span class="state">${p.open ? 'OK' : 'Indisponível'}</span>
+        </div>`;
+    }).join('');
+  } catch (err) {
+    box.innerHTML = `<div class="text-danger text-sm">${esc(err.message)}</div>`;
   }
 }
 
@@ -551,7 +620,7 @@ async function fetchSummary(force) {
     document.getElementById('pkgs-count-badge').textContent = data.pkgCount || 0;
     document.getElementById('cheats-count-badge').textContent = data.cheatCount || 0;
     const cheatsBadge = document.getElementById('dash-active-cheats');
-    if (cheatsBadge) cheatsBadge.textContent = `${data.cheatCount || 0} cheats instalados`;
+    if (cheatsBadge) cheatsBadge.textContent = data.cheatCount || 0;
 
     const userSelect = document.getElementById('cfg-active-user');
     if (userSelect && data.users && data.users.length > 0) {
@@ -569,7 +638,8 @@ async function fetchGames(mode) {
   const statusEl = document.getElementById('games-status');
   if (!state.games.length) {
     const c = document.getElementById('games-container');
-    if (c) c.innerHTML = `<div class="loading-state"><div class="spinner"></div><span>Lendo a biblioteca do console...</span></div>`;
+    if (c) c.innerHTML = Array.from({ length: 12 }, () =>
+      `<div aria-hidden="true"><div class="skeleton skeleton-cover"></div><div class="skeleton skeleton-line"></div><div class="skeleton skeleton-line short"></div></div>`).join('');
   }
   try {
     const q = mode === 'deep' ? '?deep=1' : (mode === 'refresh' ? '?refresh=1' : '');
@@ -621,7 +691,7 @@ function renderGames(games) {
     return;
   }
   container.innerHTML = games.map(game => `
-    <div class="game-card" data-action="open-game" data-id="${esc(game.id)}">
+    <div class="game-card" data-action="open-game" data-id="${esc(game.id)}" tabindex="0" role="button" aria-label="${esc(game.name)}">
       <div class="game-cover-box">
         <img data-icon="${esc(game.id)}" src="${esc(game.iconUrl)}" alt="" loading="lazy">
         ${game.hasCheats ? `<span class="game-badge-cheat">CHEATS</span>` : ''}
@@ -651,7 +721,7 @@ function renderRecentGames(games) {
     return;
   }
   container.innerHTML = games.map(game => `
-    <div class="game-card-mini" data-action="open-game" data-id="${esc(game.id)}">
+    <div class="game-card-mini" data-action="open-game" data-id="${esc(game.id)}" tabindex="0" role="button" aria-label="${esc(game.name)}">
       <div class="cover-wrap">
         <img data-icon="${esc(game.id)}" src="${esc(game.iconUrl)}" alt="" loading="lazy">
       </div>
@@ -691,7 +761,7 @@ async function openGameDetails(id) {
   document.getElementById('gd-btn-bg').onclick = () => triggerCoverChange(id, 'background');
   document.getElementById('gd-btn-files').onclick = () => { closeModal('modal-game'); switchTab('files'); loadFiles(`/user/appmeta/${id}/`); };
   const restoreBtn = document.getElementById('gd-btn-restore');
-  restoreBtn.style.display = game.customCover ? '' : 'none';
+  restoreBtn.hidden = !game.customCover;
   restoreBtn.onclick = () => restoreCover(id);
   openModal('modal-game');
 
@@ -706,8 +776,8 @@ async function openGameDetails(id) {
       stat('Tipo', CATEGORY_NAMES[d.category] || d.category || '—') +
       stat('Jogo base', d.appSize ? formatBytes(d.appSize) : '—') +
       stat('Atualização', d.patchSize ? formatBytes(d.patchSize) : '—');
-    restoreBtn.style.display = d.customCover ? '' : 'none';
-    document.getElementById('gd-btn-bg').style.display = d.hasPic1 ? '' : 'none';
+    restoreBtn.hidden = !d.customCover;
+    document.getElementById('gd-btn-bg').hidden = !d.hasPic1;
     document.getElementById('gd-cheats').innerHTML = d.cheats && d.cheats.length
       ? `<div class="info-box"><strong>Cheats instalados:</strong> ${d.cheats.map(esc).join(', ')}</div>`
       : '';
@@ -762,8 +832,8 @@ async function runCoverSearch() {
   const title = document.getElementById('cover-search-input').value.trim();
   const loading = document.getElementById('cover-search-loading');
   const results = document.getElementById('cover-search-results');
-  loading.style.display = 'block';
-  results.style.display = 'none';
+  loading.hidden = false;
+  results.hidden = true;
   try {
     const data = await api(`/api/covers/search?id=${encodeURIComponent(id)}&title=${encodeURIComponent(title)}`);
     state.cover.lastSearch = data;
@@ -774,13 +844,13 @@ async function runCoverSearch() {
     const filters = document.getElementById('sgdb-filters');
     const badge = document.getElementById('sgdb-count-badge');
     if (!s.hasKey) {
-      noKey.style.display = 'block';
-      filters.style.display = 'none';
+      noKey.hidden = false;
+      filters.hidden = true;
       badge.textContent = 'Requer chave';
       document.getElementById('sgdb-grid-container').innerHTML = '';
     } else {
-      noKey.style.display = 'none';
-      filters.style.display = s.games.length ? 'flex' : 'none';
+      noKey.hidden = true;
+      filters.hidden = !s.games.length;
       const sel = document.getElementById('sgdb-game-select');
       sel.innerHTML = s.games.map(g => `<option value="${esc(g.id)}">${esc(g.name)}${g.year ? ` (${esc(g.year)})` : ''}</option>`).join('');
       if (s.selectedGameId) sel.value = s.selectedGameId;
@@ -799,16 +869,16 @@ async function runCoverSearch() {
   } catch (err) {
     showToast('Erro ao buscar capas: ' + err.message, 'error');
   } finally {
-    loading.style.display = 'none';
-    results.style.display = 'block';
+    loading.hidden = true;
+    results.hidden = false;
   }
 }
 
 function renderSony(sony) {
   const sec = document.getElementById('sony-cover-section');
   const row = document.getElementById('sony-cover-row');
-  if (!sony || (!sony.icon && !sony.background)) { sec.style.display = 'none'; return; }
-  sec.style.display = 'block';
+  if (!sony || (!sony.icon && !sony.background)) { sec.hidden = true; return; }
+  sec.hidden = false;
   let html = '';
   if (sony.icon) html += `
     <div class="sony-item">
@@ -958,9 +1028,9 @@ async function loadFiles(dirPath) {
               <span>${esc(item.name)}</span>
             </div>
           </td>
-          <td style="font-family: monospace;">${item.isDir ? '--' : formatBytes(item.size)}</td>
-          <td style="color: var(--text-muted);">${esc(item.date)}</td>
-          <td style="text-align: right; white-space: nowrap;">
+          <td class="col-size">${item.isDir ? '--' : formatBytes(item.size)}</td>
+          <td class="col-date">${esc(item.date)}</td>
+          <td class="col-actions">
             ${!item.isDir ? `
               <a href="/api/files/download?path=${encodeURIComponent(fullPath)}" class="btn btn-sm btn-outline" title="Baixar">
                 <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
@@ -1037,12 +1107,12 @@ function renderCheatsList(cheats) {
     <div class="cheat-card" data-action="view-cheat" data-path="${esc(c.path)}">
       <div class="c-top">
         <div>
-          <div class="c-id">${esc(c.titleId)} • v${esc(c.version)}${c.installed ? ' • <span style="color:var(--accent-green)">instalado</span>' : ''}</div>
+          <div class="c-id">${esc(c.titleId)} • v${esc(c.version)}${c.installed ? ' • <span class="text-success">instalado</span>' : ''}</div>
           <div class="c-title">${esc(c.gameName)}</div>
         </div>
         <span class="badge cheat">JSON</span>
       </div>
-      <div style="font-size: 11px; color: var(--text-muted); display: flex; justify-content: space-between; gap: 8px;">
+      <div class="c-foot">
         <span class="text-truncate">${esc(c.filename)}</span>
         <span>${formatBytes(c.size)}</span>
       </div>
@@ -1065,18 +1135,18 @@ async function viewCheat(path) {
     const modsList = document.getElementById('cheat-view-mods');
     if (data && Array.isArray(data.mods) && data.mods.length > 0) {
       modsList.innerHTML = data.mods.map(mod => `
-        <div class="card p-3 mb-2" style="background: rgba(255,255,255,0.02); border-radius: 8px;">
-          <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px;">
+        <div class="mod-item">
+          <div class="mod-head">
             <strong>${esc(mod.name)}</strong>
-            <span class="badge" style="background: var(--ps-blue); color: #fff;">${esc(mod.type)}</span>
+            <span class="badge cheat">${esc(mod.type)}</span>
           </div>
-          <div style="font-size: 11px; color: var(--text-muted); margin-top: 6px; overflow-wrap: anywhere;">
+          <div class="mod-offsets">
             Offsets: ${esc(Array.isArray(mod.memory) ? mod.memory.map(m => m.offset).join(', ') : 'N/A')}
           </div>
         </div>
       `).join('');
     } else {
-      modsList.innerHTML = `<pre style="font-size: 12px; background: rgba(0,0,0,0.4); padding: 12px; border-radius: 6px; overflow: auto; max-height: 300px;">${esc(json.raw)}</pre>`;
+      modsList.innerHTML = `<pre class="code-block">${esc(json.raw)}</pre>`;
     }
     openModal('modal-cheat-view');
   } catch (err) {
@@ -1102,7 +1172,7 @@ async function loadPkgs() {
           <span>Tamanho: <strong>${formatBytes(pkg.size)}</strong></span>
           <span>${esc(pkg.date)}</span>
         </div>
-        <div style="display: flex; gap: 8px; margin-top: 8px;">
+        <div class="pkg-actions">
           <a href="/api/files/download?path=${encodeURIComponent(pkg.path)}" class="btn btn-sm btn-outline flex-1 text-center">Baixar</a>
           <button class="btn btn-sm btn-danger" data-action="delete" data-path="${esc(pkg.path)}" data-dir="false">Excluir</button>
         </div>
@@ -1130,7 +1200,7 @@ async function loadPcPkgs() {
     }
     info.innerHTML = (d.lanAccess
       ? `Pasta: <code>${esc(d.folder)}</code> • o PS4 vai baixar de <code>${esc(d.serverUrl)}</code>. Deixe o <strong>Remote Package Installer</strong> aberto no PS4.`
-      : `<span style="color:var(--accent-amber)">O acesso pela rede está desativado — o PS4 não conseguirá baixar. Execute <code>liberar-rede.bat</code> uma vez e reabra o programa.</span>`);
+      : `<span style="color:var(--warning)">O acesso pela rede está desativado — o PS4 não conseguirá baixar. Execute <code>liberar-rede.bat</code> uma vez e reabra o programa.</span>`);
     container.innerHTML = d.files.length ? d.files.map(f => `
       <div class="pkg-card">
         <div class="pkg-title">${esc(f.name)}</div>
@@ -1284,7 +1354,7 @@ async function fetchNetworkInfo() {
     document.getElementById('qr-container').innerHTML = qrImg;
     document.getElementById('modal-qr-target').innerHTML = qrImg +
       (net.lanAccess ? '' : `<div class="warn-box mt-3" style="text-align:left">O acesso pela rede está desativado. Feche o programa, execute <code>liberar-rede.bat</code> uma vez e abra de novo.</div>`);
-    document.querySelectorAll('.lan-warning').forEach(el => el.style.display = net.lanAccess ? 'none' : 'block');
+    document.querySelectorAll('.lan-warning').forEach(el => el.hidden = !!net.lanAccess);
   } catch (err) { }
 }
 
@@ -1378,15 +1448,15 @@ function initDragAndDrop() {
 // ================= MODALS & FORMS =================
 function initModals() {
   document.querySelectorAll('.modal-close').forEach(btn => {
-    btn.addEventListener('click', () => btn.closest('.modal-overlay').classList.remove('active'));
+    btn.addEventListener('click', () => closeModal(btn.closest('.modal-overlay').id));
   });
   document.querySelectorAll('.modal-overlay').forEach(ov => {
-    ov.addEventListener('click', (e) => { if (e.target === ov && ov.id !== 'modal-upload') ov.classList.remove('active'); });
+    ov.addEventListener('click', (e) => { if (e.target === ov && ov.id !== 'modal-upload') closeModal(ov.id); });
   });
   document.addEventListener('keydown', (e) => {
     if (e.key !== 'Escape') return;
     const open = Array.from(document.querySelectorAll('.modal-overlay.active')).filter(m => m.id !== 'modal-upload');
-    if (open.length) open[open.length - 1].classList.remove('active');
+    if (open.length) closeModal(open[open.length - 1].id);
   });
 
   document.getElementById('btn-upload-file').addEventListener('click', () => document.getElementById('generic-file-input').click());
@@ -1444,7 +1514,7 @@ async function loadConfig() {
     const keyState = document.getElementById('sgdb-key-state');
     keyInput.value = '';
     keyInput.placeholder = cfg.has_sgdb_key ? '•••••••• chave configurada (deixe em branco para manter)' : 'Insira sua chave para liberar capas da comunidade';
-    keyState.innerHTML = cfg.has_sgdb_key ? `<span style="color:var(--accent-green)">✓ Chave configurada.</span> <a href="#" class="link" id="sgdb-key-remove">remover</a> • ` : '';
+    keyState.innerHTML = cfg.has_sgdb_key ? `<span class="text-success">✓ Chave configurada.</span> <a href="#" class="link" id="sgdb-key-remove">remover</a> • ` : '';
     const rm = document.getElementById('sgdb-key-remove');
     if (rm) rm.onclick = async (e) => {
       e.preventDefault();
@@ -1558,19 +1628,29 @@ async function deleteItem(path, isDir) {
 }
 
 // ================= UTILITIES =================
+const modalReturnFocus = {};
 function openModal(id) {
-  document.getElementById(id).classList.add('active');
+  const m = document.getElementById(id);
+  modalReturnFocus[id] = document.activeElement;
+  m.classList.add('active');
+  const card = m.querySelector('.modal-card');
+  if (card) setTimeout(() => card.focus({ preventScroll: true }), 30);
 }
 
 function closeModal(id) {
   document.getElementById(id).classList.remove('active');
+  const prev = modalReturnFocus[id];
+  if (prev && typeof prev.focus === 'function' && document.body.contains(prev)) prev.focus({ preventScroll: true });
 }
 
+const TOAST_ICONS = { success: '#i-star', error: '#i-alert', info: '#i-bell' };
 function showToast(msg, type = 'info', duration = 3500) {
   const container = document.getElementById('toast-container');
   const toast = document.createElement('div');
   toast.className = `toast ${type}`;
-  toast.textContent = msg;
+  toast.setAttribute('role', type === 'error' ? 'alert' : 'status');
+  toast.innerHTML = `<svg aria-hidden="true"><use href="${TOAST_ICONS[type] || TOAST_ICONS.info}"/></svg><span></span>`;
+  toast.querySelector('span').textContent = msg;
   container.appendChild(toast);
   setTimeout(() => {
     toast.style.opacity = '0';
@@ -1715,7 +1795,7 @@ function showTourStep(index) {
   title.textContent = content.title;
   desc.textContent = content.desc;
 
-  prevBtn.style.display = index === 0 ? 'none' : 'inline-block';
+  prevBtn.style.visibility = index === 0 ? 'hidden' : 'visible';
   prevBtn.textContent = lang === 'en' ? 'Previous' : 'Anterior';
   nextBtn.textContent = (index === tourSteps.length - 1) ? (lang === 'en' ? 'Finish' : 'Concluir') : (lang === 'en' ? 'Next' : 'Próximo');
 
