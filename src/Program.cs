@@ -18,6 +18,8 @@ namespace OrbisWebManager
         public int ftp_port { get; set; }
         public int payload_port { get; set; }
         public int http_port { get; set; }
+        public string ps4_fw { get; set; }
+        public string active_user { get; set; }
 
         public static Config Load(string path)
         {
@@ -27,7 +29,10 @@ namespace OrbisWebManager
                 try
                 {
                     string json = File.ReadAllText(path);
-                    return serializer.Deserialize<Config>(json);
+                    var cfg = serializer.Deserialize<Config>(json);
+                    if (string.IsNullOrEmpty(cfg.ps4_fw)) cfg.ps4_fw = "9.00";
+                    if (cfg.active_user == null) cfg.active_user = "";
+                    return cfg;
                 }
                 catch { }
             }
@@ -36,7 +41,9 @@ namespace OrbisWebManager
                 ps4_ip = "192.168.18.54",
                 ftp_port = 2121,
                 payload_port = 9090,
-                http_port = 5000
+                http_port = 5000,
+                ps4_fw = "9.00",
+                active_user = ""
             };
             def.Save(path);
             return def;
@@ -48,6 +55,14 @@ namespace OrbisWebManager
             string json = serializer.Serialize(this);
             File.WriteAllText(path, json);
         }
+    }
+
+    public class PS4User
+    {
+        public string id { get; set; }
+        public string name { get; set; }
+        public string date { get; set; }
+        public DateTime lastModified { get; set; }
     }
 
     public class FtpItem
@@ -88,6 +103,35 @@ namespace OrbisWebManager
         public static string WwwDir;
         public static string ConfigPath;
         public static Dictionary<string, string> GameTitleCache = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        public static Dictionary<string, string> UserNameCache = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+        public static DateTime ParseFtpDate(string dateStr)
+        {
+            if (string.IsNullOrEmpty(dateStr)) return DateTime.MinValue;
+            string[] parts = dateStr.Split(new char[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length >= 3)
+            {
+                int year = DateTime.Now.Year;
+                int day = 1;
+                int.TryParse(parts[1], out day);
+                if (!parts[2].Contains(":"))
+                {
+                    int.TryParse(parts[2], out year);
+                }
+                int month = 1;
+                string[] months = { "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec" };
+                for (int i = 0; i < months.Length; i++)
+                {
+                    if (parts[0].StartsWith(months[i], StringComparison.OrdinalIgnoreCase))
+                    {
+                        month = i + 1;
+                        break;
+                    }
+                }
+                try { return new DateTime(year, month, day); } catch { }
+            }
+            return DateTime.MinValue;
+        }
 
         // Synchronization lock for PS4 embedded FTP server to prevent concurrent connection drops
         private static readonly object FtpLock = new object();
@@ -380,23 +424,84 @@ namespace OrbisWebManager
                 catch { }
 
                 string username = "PlayStation 4";
+                string userId = "";
+                List<object> detectedUsers = new List<object>();
                 try
                 {
                     var userFolders = ListFtpDirectory("/user/home/");
+                    var userList = new List<PS4User>();
                     foreach (var uf in userFolders)
                     {
-                        if (uf.isDir && uf.name.Length > 2)
+                        if (uf.isDir && uf.name.Length >= 4 && uf.name != "." && uf.name != "..")
                         {
-                            string userDat = DownloadFtpText("/user/home/" + uf.name + "/username.dat");
-                            if (!string.IsNullOrEmpty(userDat))
+                            string uName = "";
+                            if (UserNameCache.ContainsKey(uf.name))
                             {
-                                username = userDat.Trim();
-                                break;
+                                uName = UserNameCache[uf.name];
                             }
+                            else
+                            {
+                                string userDat = DownloadFtpText("/user/home/" + uf.name + "/username.dat");
+                                if (!string.IsNullOrEmpty(userDat))
+                                {
+                                    uName = userDat.Trim('\0', ' ', '\r', '\n');
+                                    UserNameCache[uf.name] = uName;
+                                }
+                            }
+
+                            if (string.IsNullOrEmpty(uName)) uName = uf.name;
+
+                            userList.Add(new PS4User
+                            {
+                                id = uf.name,
+                                name = uName,
+                                date = uf.date,
+                                lastModified = ParseFtpDate(uf.date)
+                            });
+                        }
+                    }
+
+                    if (userList.Count > 0)
+                    {
+                        userList.Sort((a, b) => b.lastModified.CompareTo(a.lastModified));
+
+                        PS4User chosen = null;
+                        if (!string.IsNullOrEmpty(Settings.active_user))
+                        {
+                            chosen = userList.Find(u => u.name.Equals(Settings.active_user, StringComparison.OrdinalIgnoreCase) || u.id.Equals(Settings.active_user, StringComparison.OrdinalIgnoreCase));
+                        }
+                        if (chosen == null)
+                        {
+                            chosen = userList[0];
+                        }
+
+                        username = chosen.name;
+                        userId = chosen.id;
+
+                        foreach (var u in userList)
+                        {
+                            detectedUsers.Add(new
+                            {
+                                id = u.id,
+                                name = u.name,
+                                date = u.date,
+                                isCurrent = (u.id == chosen.id)
+                            });
                         }
                     }
                 }
                 catch { }
+
+                string goldhenVer = "GoldHEN v2.2";
+                if (!string.IsNullOrEmpty(banner))
+                {
+                    var mHen = Regex.Match(banner, @"(GoldHEN[^\r\n]*)", RegexOptions.IgnoreCase);
+                    if (mHen.Success)
+                    {
+                        string rawVer = mHen.Groups[1].Value.Replace("FTP server", "").Replace("FTP Server", "").Trim();
+                        goldhenVer = Regex.Replace(rawVer, @"\s+", " ");
+                    }
+                }
 
                 int cheatCount = 0;
                 try
@@ -432,7 +537,11 @@ namespace OrbisWebManager
                     payloadPort = Settings.payload_port,
                     payloadPortOk = payloadPortOk,
                     banner = banner,
+                    fw = string.IsNullOrEmpty(Settings.ps4_fw) ? "9.00" : Settings.ps4_fw,
+                    goldhenVer = goldhenVer,
                     username = username,
+                    userId = userId,
+                    users = detectedUsers,
                     cheatCount = cheatCount,
                     pkgCount = pkgCount,
                     totalPkgSize = totalPkgSize
@@ -969,9 +1078,11 @@ namespace OrbisWebManager
                         string body = r.ReadToEnd();
                         var serializer = new JavaScriptSerializer();
                         var newCfg = serializer.Deserialize<Config>(body);
-                        Settings.ps4_ip = newCfg.ps4_ip;
-                        Settings.ftp_port = newCfg.ftp_port;
-                        Settings.payload_port = newCfg.payload_port;
+                        if (!string.IsNullOrEmpty(newCfg.ps4_ip)) Settings.ps4_ip = newCfg.ps4_ip;
+                        if (newCfg.ftp_port > 0) Settings.ftp_port = newCfg.ftp_port;
+                        if (newCfg.payload_port > 0) Settings.payload_port = newCfg.payload_port;
+                        if (!string.IsNullOrEmpty(newCfg.ps4_fw)) Settings.ps4_fw = newCfg.ps4_fw;
+                        if (newCfg.active_user != null) Settings.active_user = newCfg.active_user;
                         Settings.Save(ConfigPath);
                     }
                 }

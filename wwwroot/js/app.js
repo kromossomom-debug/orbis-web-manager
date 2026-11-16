@@ -100,6 +100,9 @@ const translations = {
     settings_ip: "Endereço de IP do PS4",
     settings_ftp: "Porta FTP (GoldHEN)",
     settings_payload: "Porta Payload (BinLoader)",
+    settings_fw: "Versão do Firmware do PS4 (FW)",
+    settings_active_user: "Perfil de Usuário Ativo",
+    settings_user_auto: "Auto-detectar (Mais Recente)",
     settings_save: "Salvar Configurações",
 
     donate_main_title: "Apoie o Desenvolvimento do Orbis Web Manager ❤️",
@@ -199,6 +202,9 @@ const translations = {
     settings_ip: "PS4 IP Address",
     settings_ftp: "FTP Port (GoldHEN)",
     settings_payload: "Payload Port (BinLoader)",
+    settings_fw: "PS4 Firmware Version (FW)",
+    settings_active_user: "Active User Profile",
+    settings_user_auto: "Auto-detect (Most Recent)",
     settings_save: "Save Settings",
 
     donate_main_title: "Support Orbis Web Manager Development ❤️",
@@ -511,6 +517,27 @@ async function fetchStatus() {
 
     document.getElementById('dash-banner').textContent = data.banner || 'GoldHEN FTP Server';
     document.getElementById('dash-user').textContent = data.username || 'PlayStation 4';
+
+    const fwBadge = document.getElementById('dash-fw-badge');
+    if (fwBadge) {
+      const fw = data.fw || '9.00';
+      const hen = data.goldhenVer || 'GoldHEN v2.2';
+      fwBadge.textContent = `FW: ${fw} • ${hen}`;
+    }
+
+    // Populate user profile options in settings if users detected
+    if (data.users && data.users.length > 0) {
+      const userSelect = document.getElementById('cfg-active-user');
+      if (userSelect && userSelect.options.length <= 1) {
+        data.users.forEach(u => {
+          const opt = document.createElement('option');
+          opt.value = u.name;
+          opt.textContent = `${u.name} (${u.id})${u.isCurrent ? ' [Ativo]' : ''}`;
+          if (u.isCurrent) opt.selected = true;
+          userSelect.appendChild(opt);
+        });
+      }
+    }
 
     document.getElementById('dash-port-ftp').textContent = data.ftpOk ? `FTP ${data.ftpPort}: Ativo` : `FTP ${data.ftpPort}: Inativo`;
     document.getElementById('dash-port-payload').textContent = data.payloadPortOk ? `Porta ${data.payloadPort}: Aberta` : `Porta ${data.payloadPort}: Fechada`;
@@ -1081,18 +1108,63 @@ function initModals() {
   document.getElementById('btn-run-convert').addEventListener('click', runRegionConversion);
 }
 
+async function loadConfig() {
+  try {
+    const res = await fetch('/api/config');
+    if (res.ok) {
+      const cfg = await res.json();
+      if (cfg.ps4_ip) document.getElementById('cfg-ps4-ip').value = cfg.ps4_ip;
+      if (cfg.ftp_port) document.getElementById('cfg-ftp-port').value = cfg.ftp_port;
+      if (cfg.payload_port) document.getElementById('cfg-payload-port').value = cfg.payload_port;
+      if (cfg.ps4_fw) document.getElementById('cfg-ps4-fw').value = cfg.ps4_fw;
+      if (cfg.active_user !== undefined && cfg.active_user !== "") {
+        const uSel = document.getElementById('cfg-active-user');
+        if (uSel) {
+          let found = false;
+          for (let i = 0; i < uSel.options.length; i++) {
+            if (uSel.options[i].value === cfg.active_user) {
+              uSel.selectedIndex = i;
+              found = true;
+              break;
+            }
+          }
+          if (!found) {
+            const opt = document.createElement('option');
+            opt.value = cfg.active_user;
+            opt.textContent = cfg.active_user;
+            opt.selected = true;
+            uSel.appendChild(opt);
+          }
+        }
+      }
+    }
+  } catch (err) {
+    console.error('Error loading config:', err);
+  }
+}
+
 function initForms() {
+  loadConfig();
+
   document.getElementById('settings-form').addEventListener('submit', async (e) => {
     e.preventDefault();
     const ip = document.getElementById('cfg-ps4-ip').value.trim();
     const ftp = parseInt(document.getElementById('cfg-ftp-port').value);
     const payload = parseInt(document.getElementById('cfg-payload-port').value);
+    const fw = document.getElementById('cfg-ps4-fw').value.trim();
+    const activeUser = document.getElementById('cfg-active-user').value;
 
     try {
       const res = await fetch('/api/config', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ps4_ip: ip, ftp_port: ftp, payload_port: payload })
+        body: JSON.stringify({
+          ps4_ip: ip,
+          ftp_port: ftp,
+          payload_port: payload,
+          ps4_fw: fw,
+          active_user: activeUser
+        })
       });
       if (res.ok) {
         showToast('Configurações salvas com sucesso!', 'success');
