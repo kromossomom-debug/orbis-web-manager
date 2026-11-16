@@ -130,7 +130,7 @@
             <span class="status-dot" id="ping-dot"></span>
             <span class="ping-val">-- ms</span>
           </div>
-          <button class="btn btn-ghost btn-icon" id="btn-tour-start" aria-label="Tutorial interativo" title="Tutorial">
+          <button class="btn btn-ghost btn-icon hide-mobile" id="btn-tour-start" aria-label="Tutorial interativo" title="Tutorial">
             <svg><use href="#i-help"/></svg>
           </button>
           <button class="btn btn-ghost" id="btn-lang-toggle" aria-label="Alterar idioma" title="Alterar idioma / Switch language">
@@ -162,64 +162,104 @@
             <button class="btn btn-primary btn-sm" data-tab-trigger="settings">Abrir Configurações</button>
           </div>
 
-          <div class="hero-grid">
-            <!-- Console card -->
-            <div class="card console-card">
-              <div class="console-head">
-                <div class="console-avatar" aria-hidden="true"><svg><use href="#i-console"/></svg></div>
-                <div class="grow">
-                  <div class="status-text"><span class="status-dot" id="console-dot"></span><span id="dash-online-status">Conectando…</span></div>
-                  <div class="console-sub" id="dash-banner">GoldHEN FTP Server</div>
-                </div>
-              </div>
-              <div class="console-facts">
-                <span class="badge" id="dash-user-badge"><svg width="12" height="12"><use href="#i-games"/></svg><span id="dash-user">—</span></span>
-                <span class="badge outline" id="dash-fw-badge">FW —</span>
-                <span class="badge outline mono" id="dash-port-ftp">FTP —</span>
-              </div>
-              <!-- KPIs -->
-              <div class="stats-grid">
-                <button class="card stat-card" data-tab-trigger="games">
-                  <span class="stat-icon"><svg><use href="#i-games"/></svg></span>
-                  <span class="stat-body">
-                    <span class="stat-title" data-i18n="stat_installed_games">Jogos Instalados</span>
-                    <span class="stat-val" id="dash-games-count">—</span>
-                  </span>
-                </button>
-                <button class="card stat-card" data-tab-trigger="cheats">
-                  <span class="stat-icon"><svg><use href="#i-bolt"/></svg></span>
-                  <span class="stat-body">
-                    <span class="stat-title" data-i18n="stat_cheats_avail">Cheats Disponíveis</span>
-                    <span class="stat-val" id="dash-active-cheats">—</span>
-                  </span>
-                </button>
-                <button class="card stat-card" data-tab-trigger="pkgs">
-                  <span class="stat-icon"><svg><use href="#i-package"/></svg></span>
-                  <span class="stat-body">
-                    <span class="stat-title" data-i18n="stat_storage_pkgs">Armazenamento / PKGs</span>
-                    <span class="stat-val" id="dash-pkg-size">—</span>
-                    <span class="stat-sub" id="dash-pkg-count">em /data/pkg/</span>
-                  </span>
-                </button>
-              </div>
+          <!-- 1. Console status strip -->
+          <div class="card status-strip">
+            <div class="console-avatar" aria-hidden="true"><svg><use href="#i-console"/></svg></div>
+            <div class="status-main">
+              <div class="status-text"><span class="status-dot" id="console-dot"></span><span id="dash-online-status">Conectando…</span></div>
+              <div class="console-sub" id="dash-banner">GoldHEN FTP Server</div>
             </div>
+            <div class="console-facts">
+              <span class="fact"><span class="fact-label">Perfil</span><span class="fact-val" id="dash-user">—</span></span>
+              <span class="fact"><span class="fact-label">Sistema</span><span class="fact-val" id="dash-fw-badge">—</span></span>
+              <span class="fact"><span class="fact-label">FTP</span><span class="fact-val mono" id="dash-port-ftp">—</span></span>
+            </div>
+          </div>
 
-            <!-- Health checklist -->
-            <div class="card health-card">
-              <div class="card-head">
+          <!-- 2. KPIs -->
+          <div class="stats-grid">
+            <button class="card stat-card" data-tab-trigger="games">
+              <span class="stat-body">
+                <span class="stat-title" data-i18n="stat_installed_games">Jogos</span>
+                <span class="stat-val" id="dash-games-count">—</span>
+                <span class="stat-sub">instalados no console</span>
+              </span>
+              <span class="stat-icon"><svg><use href="#i-games"/></svg></span>
+            </button>
+            <button class="card stat-card" data-tab-trigger="cheats">
+              <span class="stat-body">
+                <span class="stat-title" data-i18n="stat_cheats_avail">Cheats</span>
+                <span class="stat-val" id="dash-active-cheats">—</span>
+                <span class="stat-sub">arquivos do GoldHEN</span>
+              </span>
+              <span class="stat-icon"><svg><use href="#i-bolt"/></svg></span>
+            </button>
+            <button class="card stat-card" data-tab-trigger="pkgs">
+              <span class="stat-body">
+                <span class="stat-title" data-i18n="stat_storage_pkgs">PKGs no console</span>
+                <span class="stat-val" id="dash-pkg-size">—</span>
+                <span class="stat-sub" id="dash-pkg-count">em /data/pkg/</span>
+              </span>
+              <span class="stat-icon"><svg><use href="#i-package"/></svg></span>
+            </button>
+          </div>
+
+          <!-- 3. Services + quick actions -->
+          <div class="dash-columns">
+            <div class="card panel">
+              <div class="panel-head">
                 <div>
-                  <h3>O que está funcionando</h3>
-                  <p class="text-muted">Serviços do console usados pelo app</p>
+                  <h3>Serviços do console</h3>
+                  <p>O que o app consegue usar agora</p>
                 </div>
-                <button class="btn btn-ghost btn-sm" id="dash-port-payload" aria-label="Verificar serviços novamente"><svg><use href="#i-refresh"/></svg>Verificar</button>
+                <button class="btn btn-outline btn-sm" id="dash-port-payload"><svg><use href="#i-refresh"/></svg>Verificar</button>
               </div>
               <div class="health-list" id="health-list">
                 <div class="text-muted text-sm">Clique em Verificar para testar os serviços.</div>
               </div>
             </div>
+
+            <div class="card panel">
+              <div class="panel-head">
+                <div>
+                  <h3 data-i18n="quick_actions">Ações rápidas</h3>
+                  <p>Atalhos para o que você mais usa</p>
+                </div>
+              </div>
+              <div class="quick-action-grid">
+                <button class="action-btn" id="action-upload-pkg">
+                  <span class="action-icon"><svg><use href="#i-package"/></svg></span>
+                  <span class="action-text">
+                    <strong data-i18n="act_upload_pkg_title">Enviar PKG</strong>
+                    <span data-i18n="act_upload_pkg_desc">Upload para /data/pkg/</span>
+                  </span>
+                </button>
+                <button class="action-btn" id="action-upload-cheat">
+                  <span class="action-icon"><svg><use href="#i-bolt"/></svg></span>
+                  <span class="action-text">
+                    <strong data-i18n="act_upload_cheat_title">Novo cheat</strong>
+                    <span data-i18n="act_upload_cheat_desc">Enviar arquivo JSON</span>
+                  </span>
+                </button>
+                <button class="action-btn" id="action-browse-files">
+                  <span class="action-icon"><svg><use href="#i-folder"/></svg></span>
+                  <span class="action-text">
+                    <strong data-i18n="act_browse_files_title">Explorar disco</strong>
+                    <span data-i18n="act_browse_files_desc">Pastas do PS4</span>
+                  </span>
+                </button>
+                <button class="action-btn" id="action-convert-cheat">
+                  <span class="action-icon"><svg><use href="#i-swap"/></svg></span>
+                  <span class="action-text">
+                    <strong data-i18n="act_convert_cheat_title">Conversor CUSA</strong>
+                    <span data-i18n="act_convert_cheat_desc">Cheat de outra região</span>
+                  </span>
+                </button>
+              </div>
+            </div>
           </div>
 
-          <!-- Continue playing -->
+          <!-- 4. Most played -->
           <div class="section-header">
             <div class="section-title-wrap">
               <h3>Mais jogados</h3>
@@ -229,41 +269,6 @@
           </div>
           <div class="recent-games-slider" id="dash-recent-games">
             <div class="loading-state"><div class="spinner"></div><span>Carregando biblioteca…</span></div>
-          </div>
-
-          <!-- Quick actions -->
-          <div class="section-header">
-            <h3 data-i18n="quick_actions">Ações Rápidas</h3>
-          </div>
-          <div class="quick-action-grid">
-            <button class="action-btn" id="action-upload-pkg">
-              <span class="action-icon"><svg><use href="#i-package"/></svg></span>
-              <span class="action-text">
-                <strong data-i18n="act_upload_pkg_title">Enviar PKG</strong>
-                <span data-i18n="act_upload_pkg_desc">Upload direto para /data/pkg/</span>
-              </span>
-            </button>
-            <button class="action-btn" id="action-upload-cheat">
-              <span class="action-icon"><svg><use href="#i-bolt"/></svg></span>
-              <span class="action-text">
-                <strong data-i18n="act_upload_cheat_title">Novo Cheat JSON</strong>
-                <span data-i18n="act_upload_cheat_desc">Enviar ou converter código</span>
-              </span>
-            </button>
-            <button class="action-btn" id="action-browse-files">
-              <span class="action-icon"><svg><use href="#i-folder"/></svg></span>
-              <span class="action-text">
-                <strong data-i18n="act_browse_files_title">Explorar Disco</strong>
-                <span data-i18n="act_browse_files_desc">Navegar pelas pastas do PS4</span>
-              </span>
-            </button>
-            <button class="action-btn" id="action-convert-cheat">
-              <span class="action-icon"><svg><use href="#i-swap"/></svg></span>
-              <span class="action-text">
-                <strong data-i18n="act_convert_cheat_title">Conversor CUSA</strong>
-                <span data-i18n="act_convert_cheat_desc">Adaptar cheat de outra região</span>
-              </span>
-            </button>
           </div>
         </section>
 
