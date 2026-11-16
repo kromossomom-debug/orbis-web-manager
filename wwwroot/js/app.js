@@ -368,7 +368,7 @@ function initNavigation() {
         if (d.success) {
           showToast('Notificação enviada para a tela do PS4!', 'success');
         } else {
-          showToast('Falha ao enviar notificação.', 'error');
+          showToast(d.error || 'Falha ao enviar notificação.', 'error');
         }
       } catch (e) {
         showToast('Erro ao comunicar com console.', 'error');

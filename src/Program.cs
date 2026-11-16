@@ -1035,25 +1035,47 @@ namespace OrbisWebManager
                     return;
                 }
 
-                bool sent = false;
+                // Probe if port 9090 is actually open
+                bool portOpen = false;
                 try
                 {
                     using (var c = new TcpClient())
                     {
                         var ar = c.BeginConnect(Settings.ps4_ip, Settings.payload_port, null, null);
-                        bool success = ar.AsyncWaitHandle.WaitOne(1000);
-                        if (success && c.Connected)
-                        {
-                            c.EndConnect(ar);
-                            byte[] notifyBytes = Encoding.UTF8.GetBytes(msg + "\0");
-                            c.GetStream().Write(notifyBytes, 0, notifyBytes.Length);
-                            sent = true;
-                        }
+                        portOpen = ar.AsyncWaitHandle.WaitOne(800) && c.Connected;
+                        if (portOpen) c.EndConnect(ar);
                     }
                 }
                 catch { }
 
-                SendJson(res, new { success = true, delivered = sent, message = msg });
+                if (!portOpen)
+                {
+                    SendJson(res, new
+                    {
+                        success = false,
+                        error = "A porta " + Settings.payload_port + " (BinLoader Server) está desativada no seu PS4. No console, vá em 'Configurações > GoldHEN' e marque 'Enable BinLoader Server'."
+                    });
+                    return;
+                }
+
+                bool sent = false;
+                try
+                {
+                    using (var c = new TcpClient())
+                    {
+                        c.Connect(Settings.ps4_ip, Settings.payload_port);
+                        byte[] notifyBytes = Encoding.UTF8.GetBytes(msg + "\0");
+                        c.GetStream().Write(notifyBytes, 0, notifyBytes.Length);
+                        sent = true;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    SendJson(res, new { success = false, error = "Falha ao enviar para porta " + Settings.payload_port + ": " + ex.Message });
+                    return;
+                }
+
+                SendJson(res, new { success = sent, delivered = sent, message = msg });
                 return;
             }
 
