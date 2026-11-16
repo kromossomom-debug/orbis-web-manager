@@ -103,6 +103,7 @@ const translations = {
     settings_fw: "Versão do Firmware do PS4 (FW)",
     settings_active_user: "Perfil de Usuário Ativo",
     settings_user_auto: "Auto-detectar (Mais Recente)",
+    settings_sgdb_key: "Chave de API do SteamGridDB (Opcional)",
     settings_save: "Salvar Configurações",
 
     donate_main_title: "Apoie o Desenvolvimento do Orbis Web Manager ❤️",
@@ -205,6 +206,7 @@ const translations = {
     settings_fw: "PS4 Firmware Version (FW)",
     settings_active_user: "Active User Profile",
     settings_user_auto: "Auto-detect (Most Recent)",
+    settings_sgdb_key: "SteamGridDB API Key (Optional)",
     settings_save: "Save Settings",
 
     donate_main_title: "Support Orbis Web Manager Development ❤️",
@@ -440,6 +442,29 @@ function initNavigation() {
 
   const tourNextBtn = document.getElementById('tour-next-btn');
   if (tourNextBtn) tourNextBtn.addEventListener('click', () => showTourStep(currentTourStep + 1));
+
+  // Online Cover Search Trigger
+  const btnCoverSearch = document.getElementById('btn-cover-search-exec');
+  if (btnCoverSearch) {
+    btnCoverSearch.addEventListener('click', () => {
+      const q = document.getElementById('cover-search-input').value.trim();
+      if (q && state.selectedGameIdForCover) {
+        searchCoversOnline(state.selectedGameIdForCover, q);
+      }
+    });
+  }
+
+  const coverSearchInput = document.getElementById('cover-search-input');
+  if (coverSearchInput) {
+    coverSearchInput.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') {
+        const q = coverSearchInput.value.trim();
+        if (q && state.selectedGameIdForCover) {
+          searchCoversOnline(state.selectedGameIdForCover, q);
+        }
+      }
+    });
+  }
 }
 
 function updateTabTitles(tabId) {
@@ -639,11 +664,130 @@ function renderRecentGames(games) {
 
 // ================= COVER CHANGER =================
 function triggerCoverChange(gameId, event) {
-  event.stopPropagation();
+  if (event) event.stopPropagation();
   state.selectedGameIdForCover = gameId;
+
+  let gameTitle = gameId;
+  if (state.games && state.games.length > 0) {
+    const found = state.games.find(g => g.id === gameId);
+    if (found && found.name) gameTitle = found.name;
+  }
+
+  openCoverSearchModal(gameId, gameTitle);
+}
+
+function triggerLocalFileUpload() {
+  closeModal('modal-cover-search');
   const input = document.getElementById('cover-file-input');
   input.value = '';
   input.click();
+}
+
+function openCoverSearchModal(gameId, gameTitle) {
+  state.selectedGameIdForCover = gameId;
+  state.selectedGameTitleForCover = gameTitle;
+
+  const titleEl = document.getElementById('modal-cover-title');
+  const subEl = document.getElementById('modal-cover-sub');
+  const inputEl = document.getElementById('cover-search-input');
+
+  if (titleEl) titleEl.textContent = `Buscar Capa - ${gameTitle}`;
+  if (subEl) subEl.textContent = `Title ID: ${gameId}`;
+  if (inputEl) inputEl.value = gameTitle;
+
+  openModal('modal-cover-search');
+  searchCoversOnline(gameId, gameTitle);
+}
+
+async function searchCoversOnline(gameId, searchTitle) {
+  const loading = document.getElementById('cover-search-loading');
+  const results = document.getElementById('cover-search-results');
+  const sonySec = document.getElementById('sony-cover-section');
+  const sgdbGrid = document.getElementById('sgdb-grid-container');
+  const sgdbBadge = document.getElementById('sgdb-count-badge');
+  const noKeyBanner = document.getElementById('sgdb-no-key-banner');
+
+  if (loading) loading.style.display = 'block';
+  if (results) results.style.display = 'none';
+  if (sonySec) sonySec.style.display = 'none';
+  if (sgdbGrid) sgdbGrid.innerHTML = '';
+
+  try {
+    const res = await fetch(`/api/game/covers/search?id=${encodeURIComponent(gameId)}&title=${encodeURIComponent(searchTitle)}`);
+    const data = await res.json();
+
+    if (loading) loading.style.display = 'none';
+    if (results) results.style.display = 'block';
+
+    // 1. Sony Official TMDB
+    if (data.sony && data.sony.available && data.sony.icon) {
+      if (sonySec) sonySec.style.display = 'block';
+      const previewImg = document.getElementById('sony-cover-preview');
+      if (previewImg) previewImg.src = data.sony.icon;
+      const btnApplySony = document.getElementById('btn-apply-sony-cover');
+      if (btnApplySony) {
+        btnApplySony.onclick = () => applyCoverOnline(gameId, data.sony.icon);
+      }
+    }
+
+    // 2. SteamGridDB
+    if (!data.steamgriddb.hasKey) {
+      if (noKeyBanner) noKeyBanner.style.display = 'block';
+      if (sgdbBadge) sgdbBadge.textContent = 'Requer Chave';
+    } else {
+      if (noKeyBanner) noKeyBanner.style.display = 'none';
+      const grids = data.steamgriddb.grids || [];
+      if (sgdbBadge) sgdbBadge.textContent = `${grids.length} encontradas`;
+
+      if (grids.length === 0) {
+        if (sgdbGrid) {
+          sgdbGrid.innerHTML = `<p class="text-muted text-sm" style="grid-column: 1 / -1;">Nenhuma arte encontrada para "${searchTitle}". Tente simplificar o nome na barra de busca acima.</p>`;
+        }
+      } else {
+        if (sgdbGrid) {
+          sgdbGrid.innerHTML = grids.map(g => `
+            <div class="sgdb-card" style="position: relative; border-radius: 8px; overflow: hidden; background: var(--bg-surface-elevated); border: 1px solid var(--border-subtle); display: flex; flex-direction: column;">
+              <div style="aspect-ratio: 2/3; overflow: hidden; position: relative;">
+                <img src="${g.thumb || g.url}" alt="Arte" loading="lazy" style="width: 100%; height: 100%; object-fit: cover;">
+                <button class="btn btn-primary btn-sm" onclick="applyCoverOnline('${gameId}', '${g.url}')" style="position: absolute; bottom: 8px; left: 8px; right: 8px; opacity: 0.95; font-size: 11px; padding: 6px;">
+                  Aplicar
+                </button>
+              </div>
+              <div style="padding: 6px 8px; font-size: 11px;" class="text-muted text-truncate">
+                Por: ${g.author || 'Comunidade'}
+              </div>
+            </div>
+          `).join('');
+        }
+      }
+    }
+  } catch (err) {
+    if (loading) loading.style.display = 'none';
+    if (results) results.style.display = 'block';
+    showToast('Erro ao buscar capas online: ' + err.message, 'error');
+  }
+}
+
+async function applyCoverOnline(gameId, imageUrl) {
+  showToast(`Baixando e aplicando capa para ${gameId}...`, 'info');
+  try {
+    const res = await fetch('/api/game/covers/apply', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: gameId, url: imageUrl })
+    });
+    const data = await res.json();
+    if (data.success) {
+      showToast(`Capa do jogo ${gameId} atualizada com sucesso!`, 'success');
+      const img = document.getElementById(`game-img-${gameId}`);
+      if (img) img.src = data.iconUrl;
+      closeModal('modal-cover-search');
+    } else {
+      showToast(`Falha ao aplicar capa: ${data.error}`, 'error');
+    }
+  } catch (err) {
+    showToast(`Erro ao aplicar capa: ${err.message}`, 'error');
+  }
 }
 
 async function uploadNewCover(file, gameId) {
@@ -1117,6 +1261,10 @@ async function loadConfig() {
       if (cfg.ftp_port) document.getElementById('cfg-ftp-port').value = cfg.ftp_port;
       if (cfg.payload_port) document.getElementById('cfg-payload-port').value = cfg.payload_port;
       if (cfg.ps4_fw) document.getElementById('cfg-ps4-fw').value = cfg.ps4_fw;
+      if (cfg.steamgriddb_api_key) {
+        const sgdbInput = document.getElementById('cfg-sgdb-key');
+        if (sgdbInput) sgdbInput.value = cfg.steamgriddb_api_key;
+      }
       if (cfg.active_user !== undefined && cfg.active_user !== "") {
         const uSel = document.getElementById('cfg-active-user');
         if (uSel) {
@@ -1153,6 +1301,7 @@ function initForms() {
     const payload = parseInt(document.getElementById('cfg-payload-port').value);
     const fw = document.getElementById('cfg-ps4-fw').value.trim();
     const activeUser = document.getElementById('cfg-active-user').value;
+    const sgdbKey = document.getElementById('cfg-sgdb-key') ? document.getElementById('cfg-sgdb-key').value.trim() : '';
 
     try {
       const res = await fetch('/api/config', {
@@ -1163,7 +1312,8 @@ function initForms() {
           ftp_port: ftp,
           payload_port: payload,
           ps4_fw: fw,
-          active_user: activeUser
+          active_user: activeUser,
+          steamgriddb_api_key: sgdbKey
         })
       });
       if (res.ok) {

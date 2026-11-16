@@ -8,6 +8,7 @@ using System.Net.Sockets;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
+using System.Security.Cryptography;
 using System.Web.Script.Serialization;
 
 namespace OrbisWebManager
@@ -20,6 +21,7 @@ namespace OrbisWebManager
         public int http_port { get; set; }
         public string ps4_fw { get; set; }
         public string active_user { get; set; }
+        public string steamgriddb_api_key { get; set; }
 
         public static Config Load(string path)
         {
@@ -32,6 +34,7 @@ namespace OrbisWebManager
                     var cfg = serializer.Deserialize<Config>(json);
                     if (string.IsNullOrEmpty(cfg.ps4_fw)) cfg.ps4_fw = "9.00";
                     if (cfg.active_user == null) cfg.active_user = "";
+                    if (cfg.steamgriddb_api_key == null) cfg.steamgriddb_api_key = "";
                     return cfg;
                 }
                 catch { }
@@ -43,7 +46,8 @@ namespace OrbisWebManager
                 payload_port = 9090,
                 http_port = 5000,
                 ps4_fw = "9.00",
-                active_user = ""
+                active_user = "",
+                steamgriddb_api_key = ""
             };
             def.Save(path);
             return def;
@@ -133,11 +137,87 @@ namespace OrbisWebManager
             return DateTime.MinValue;
         }
 
+        private static readonly byte[] TmdbMasterKey = new byte[] {
+            0xF5, 0xDE, 0x66, 0xD2, 0x68, 0x0E, 0x25, 0x5B, 0x2D, 0xF7, 0x9E, 0x74, 0xF8, 0x90, 0xEB, 0xF3,
+            0x49, 0x26, 0x2F, 0x61, 0x8B, 0xCA, 0xE2, 0xA9, 0xAC, 0xCD, 0xEE, 0x51, 0x56, 0xCE, 0x8D, 0xF2,
+            0xCD, 0xF2, 0xD4, 0x8C, 0x71, 0x17, 0x3C, 0xDC, 0x25, 0x94, 0x46, 0x5B, 0x87, 0x40, 0x5D, 0x19,
+            0x7C, 0xF1, 0xAE, 0xD3, 0xB7, 0xE9, 0x67, 0x1E, 0xEB, 0x56, 0xCA, 0x67, 0x53, 0xC2, 0xE6, 0xB0
+        };
+
+        public static string GetSonyTmdbUrl(string titleId)
+        {
+            try
+            {
+                string target = titleId.ToUpper().Trim();
+                if (!target.EndsWith("_00")) target += "_00";
+                byte[] targetBytes = Encoding.UTF8.GetBytes(target);
+                using (var hmac = new HMACSHA1(TmdbMasterKey))
+                {
+                    byte[] hash = hmac.ComputeHash(targetBytes);
+                    StringBuilder sb = new StringBuilder();
+                    foreach (byte b in hash) sb.Append(b.ToString("X2"));
+                    string sig = sb.ToString();
+                    return "https://tmdb.np.dl.playstation.net/tmdb2/" + target + "_" + sig + "/" + target + ".json";
+                }
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        public static string FetchSonyIconUrl(string titleId)
+        {
+            try
+            {
+                string url = GetSonyTmdbUrl(titleId);
+                if (string.IsNullOrEmpty(url)) return null;
+
+                var req = (HttpWebRequest)WebRequest.Create(url);
+                req.UserAgent = "Mozilla/5.0";
+                req.Timeout = 5000;
+                using (var res = (HttpWebResponse)req.GetResponse())
+                using (var reader = new StreamReader(res.GetResponseStream(), Encoding.UTF8))
+                {
+                    string json = reader.ReadToEnd();
+                    var mIcon = Regex.Match(json, @"""icon""\s*:\s*""([^""]+)""");
+                    if (mIcon.Success) return mIcon.Groups[1].Value;
+                }
+            }
+            catch { }
+            return null;
+        }
+
+        public static bool DownloadSonyIcon(string titleId, string localPath)
+        {
+            try
+            {
+                string iconUrl = FetchSonyIconUrl(titleId);
+                if (string.IsNullOrEmpty(iconUrl)) return false;
+
+                using (var wc = new WebClient())
+                {
+                    wc.Headers.Add("User-Agent", "Mozilla/5.0");
+                    wc.DownloadFile(iconUrl, localPath);
+                    return File.Exists(localPath);
+                }
+            }
+            catch { }
+            return false;
+        }
+
         // Synchronization lock for PS4 embedded FTP server to prevent concurrent connection drops
         private static readonly object FtpLock = new object();
 
         static void Main(string[] args)
         {
+            try
+            {
+                ServicePointManager.SecurityProtocol = (SecurityProtocolType)3072 | (SecurityProtocolType)768 | SecurityProtocolType.Tls;
+                ServicePointManager.ServerCertificateValidationCallback = (sender, cert, chain, sslPolicyErrors) => true;
+            }
+            catch { }
+
             Console.OutputEncoding = Encoding.UTF8;
             AppDir = AppDomain.CurrentDomain.BaseDirectory;
             CacheDir = Path.Combine(AppDir, "cache");
@@ -664,6 +744,12 @@ namespace OrbisWebManager
                         }
                         catch { }
                     }
+
+                    // Fallback to official Sony PlayStation TMDB CDN if not found on PS4
+                    if (!File.Exists(iconCache) && id.StartsWith("CUSA", StringComparison.OrdinalIgnoreCase))
+                    {
+                        DownloadSonyIcon(id, iconCache);
+                    }
                 }
 
                 if (File.Exists(iconCache))
@@ -721,6 +807,217 @@ namespace OrbisWebManager
                     SendJson(res, new { error = "Arquivo vazio." });
                 }
                 return;
+            }
+
+            // 4.1 SEARCH COVERS ONLINE (SONY TMDB + STEAMGRIDDB)
+            if (path == "/api/game/covers/search")
+            {
+                string id = query["id"] ?? "";
+                string title = query["title"] ?? "";
+
+                // 1. Sony PlayStation TMDB Official Artwork
+                object sonyCover = null;
+                if (!string.IsNullOrEmpty(id) && id.StartsWith("CUSA", StringComparison.OrdinalIgnoreCase))
+                {
+                    try
+                    {
+                        string sUrl = GetSonyTmdbUrl(id);
+                        if (!string.IsNullOrEmpty(sUrl))
+                        {
+                            var sReq = (HttpWebRequest)WebRequest.Create(sUrl);
+                            sReq.UserAgent = "Mozilla/5.0";
+                            sReq.Timeout = 5000;
+                            using (var sRes = (HttpWebResponse)sReq.GetResponse())
+                            using (var r = new StreamReader(sRes.GetResponseStream(), Encoding.UTF8))
+                            {
+                                string sJson = r.ReadToEnd();
+                                string iconUrl = "";
+                                string bgUrl = "";
+                                var mIcon = Regex.Match(sJson, @"""icon""\s*:\s*""([^""]+)""");
+                                if (mIcon.Success) iconUrl = mIcon.Groups[1].Value;
+                                var mBg = Regex.Match(sJson, @"""backgroundImage""\s*:\s*""([^""]+)""");
+                                if (mBg.Success) bgUrl = mBg.Groups[1].Value;
+
+                                if (!string.IsNullOrEmpty(iconUrl))
+                                {
+                                    sonyCover = new
+                                    {
+                                        available = true,
+                                        icon = iconUrl,
+                                        background = bgUrl,
+                                        source = "Sony PlayStation Store (TMDB Oficial 512x512)"
+                                    };
+                                }
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine("Sony TMDB Exception for " + id + ": " + ex.Message);
+                    }
+                }
+
+                // 2. SteamGridDB Community Grids & Artwork
+                bool hasSgdbKey = !string.IsNullOrEmpty(Settings.steamgriddb_api_key);
+                List<object> sgdbGrids = new List<object>();
+
+                if (hasSgdbKey && (!string.IsNullOrEmpty(title) || !string.IsNullOrEmpty(id)))
+                {
+                    try
+                    {
+                        string searchTerm = !string.IsNullOrEmpty(title) ? title : id;
+                        searchTerm = Regex.Replace(searchTerm, @"[®™©]", "").Trim();
+
+                        string searchUrl = "https://www.steamgriddb.com/api/v2/search/autocomplete/" + Uri.EscapeDataString(searchTerm);
+                        var sReq = (HttpWebRequest)WebRequest.Create(searchUrl);
+                        sReq.Headers.Add("Authorization", "Bearer " + Settings.steamgriddb_api_key.Trim());
+                        sReq.UserAgent = "OrbisWebManager/1.0";
+                        sReq.Timeout = 6000;
+
+                        int sgdbGameId = -1;
+                        using (var sRes = (HttpWebResponse)sReq.GetResponse())
+                        using (var r = new StreamReader(sRes.GetResponseStream(), Encoding.UTF8))
+                        {
+                            string sJson = r.ReadToEnd();
+                            var mId = Regex.Match(sJson, @"""id""\s*:\s*(\d+)");
+                            if (mId.Success)
+                            {
+                                sgdbGameId = int.Parse(mId.Groups[1].Value);
+                            }
+                        }
+
+                        if (sgdbGameId > 0)
+                        {
+                            string gridsUrl = "https://www.steamgriddb.com/api/v2/grids/game/" + sgdbGameId + "?dimensions=600x900,512x512,1024x1024,460x215,920x430";
+                            var gReq = (HttpWebRequest)WebRequest.Create(gridsUrl);
+                            gReq.Headers.Add("Authorization", "Bearer " + Settings.steamgriddb_api_key.Trim());
+                            gReq.UserAgent = "OrbisWebManager/1.0";
+                            gReq.Timeout = 6000;
+
+                            using (var gRes = (HttpWebResponse)gReq.GetResponse())
+                            using (var r = new StreamReader(gRes.GetResponseStream(), Encoding.UTF8))
+                            {
+                                string gJson = r.ReadToEnd();
+                                var ser = new JavaScriptSerializer();
+                                var d = ser.Deserialize<Dictionary<string, object>>(gJson);
+                                if (d.ContainsKey("data"))
+                                {
+                                    var grids = d["data"] as object[];
+                                    if (grids != null)
+                                    {
+                                        int count = 0;
+                                        foreach (object item in grids)
+                                        {
+                                            var g = item as Dictionary<string, object>;
+                                            if (g == null) continue;
+                                            if (count++ >= 24) break;
+
+                                            string authorName = "Comunidade";
+                                            if (g.ContainsKey("author"))
+                                            {
+                                                var auth = g["author"] as Dictionary<string, object>;
+                                                if (auth != null && auth.ContainsKey("name")) authorName = auth["name"].ToString();
+                                            }
+
+                                            sgdbGrids.Add(new
+                                            {
+                                                url = g.ContainsKey("url") ? g["url"].ToString() : "",
+                                                thumb = g.ContainsKey("thumb") ? g["thumb"].ToString() : "",
+                                                width = g.ContainsKey("width") ? g["width"] : 600,
+                                                height = g.ContainsKey("height") ? g["height"] : 900,
+                                                author = authorName
+                                            });
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    catch { }
+                }
+
+                SendJson(res, new
+                {
+                    id = id,
+                    title = title,
+                    sony = sonyCover,
+                    steamgriddb = new
+                    {
+                        hasKey = hasSgdbKey,
+                        grids = sgdbGrids
+                    }
+                });
+                return;
+            }
+
+            // 4.2 APPLY ONLINE COVER
+            if (path == "/api/game/covers/apply" && req.HttpMethod == "POST")
+            {
+                string id = "";
+                string imgUrl = "";
+
+                using (var r = new StreamReader(req.InputStream, Encoding.UTF8))
+                {
+                    string body = r.ReadToEnd();
+                    var ser = new JavaScriptSerializer();
+                    var d = ser.Deserialize<Dictionary<string, object>>(body);
+                    if (d.ContainsKey("id")) id = d["id"].ToString();
+                    if (d.ContainsKey("url")) imgUrl = d["url"].ToString();
+                }
+
+                if (string.IsNullOrEmpty(id) || string.IsNullOrEmpty(imgUrl))
+                {
+                    res.StatusCode = 400;
+                    SendJson(res, new { error = "Parâmetros 'id' e 'url' são obrigatórios." });
+                    return;
+                }
+
+                try
+                {
+                    byte[] imgBytes;
+                    using (var wc = new WebClient())
+                    {
+                        wc.Headers.Add("User-Agent", "Mozilla/5.0");
+                        imgBytes = wc.DownloadData(imgUrl);
+                    }
+
+                    if (imgBytes != null && imgBytes.Length > 0)
+                    {
+                        string iconCache = Path.Combine(IconsDir, id + ".png");
+                        File.WriteAllBytes(iconCache, imgBytes);
+
+                        // Upload to PS4 via FTP
+                        try
+                        {
+                            string remotePath = "/user/appmeta/" + id + "/icon0.png";
+                            using (var ms = new MemoryStream(imgBytes))
+                            {
+                                StreamFtpUpload(remotePath, ms, imgBytes.Length);
+                            }
+                        }
+                        catch { }
+
+                        SendJson(res, new
+                        {
+                            success = true,
+                            message = "Capa aplicada com sucesso!",
+                            iconUrl = "/api/game/icon?id=" + id + "&t=" + DateTime.Now.Ticks
+                        });
+                        return;
+                    }
+                    else
+                    {
+                        res.StatusCode = 500;
+                        SendJson(res, new { error = "Imagem vazia ou inválida recebida da URL." });
+                        return;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    res.StatusCode = 500;
+                    SendJson(res, new { error = "Falha ao baixar imagem: " + ex.Message });
+                    return;
+                }
             }
 
             // 5. CAPTURE GALLERY (SCREENSHOTS)
@@ -1083,6 +1380,7 @@ namespace OrbisWebManager
                         if (newCfg.payload_port > 0) Settings.payload_port = newCfg.payload_port;
                         if (!string.IsNullOrEmpty(newCfg.ps4_fw)) Settings.ps4_fw = newCfg.ps4_fw;
                         if (newCfg.active_user != null) Settings.active_user = newCfg.active_user;
+                        if (newCfg.steamgriddb_api_key != null) Settings.steamgriddb_api_key = newCfg.steamgriddb_api_key;
                         Settings.Save(ConfigPath);
                     }
                 }

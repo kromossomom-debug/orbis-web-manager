@@ -538,6 +538,17 @@
                 </div>
               </div>
 
+              <div class="form-group mt-3">
+                <label data-i18n="settings_sgdb_key">Chave de API do SteamGridDB (Opcional)</label>
+                <input type="password" id="cfg-sgdb-key" placeholder="Insira sua chave para liberar pôsteres e capas da comunidade">
+                <small class="text-muted" style="display: block; margin-top: 4px;">
+                  Permite buscar e baixar milhares de capas da comunidade. 
+                  <a href="https://www.steamgriddb.com/profile/preferences/api" target="_blank" rel="noopener" style="color: var(--neon-cyan); text-decoration: underline;">
+                    Pegar chave gratuita no SteamGridDB
+                  </a>
+                </small>
+              </div>
+
               <button type="submit" class="btn btn-primary mt-4">
                 <span data-i18n="settings_save">Salvar Configurações</span>
               </button>
@@ -753,6 +764,82 @@
         <div class="mt-3">
           <code id="modal-qr-url" class="qr-url-text">http://localhost:5000</code>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: BUSCAR CAPAS ONLINE (SONY TMDB & STEAMGRIDDB) -->
+  <div class="modal-overlay" id="modal-cover-search">
+    <div class="modal-card large">
+      <div class="modal-header">
+        <div>
+          <h3 id="modal-cover-title">Buscar Capas Online</h3>
+          <p class="text-muted text-sm" id="modal-cover-sub">Baixe artes oficiais da Sony TMDB ou capas do SteamGridDB</p>
+        </div>
+        <button class="modal-close" onclick="closeModal('modal-cover-search')">&times;</button>
+      </div>
+      <div class="modal-body" style="max-height: 70vh; overflow-y: auto;">
+        <!-- Search Toolbar -->
+        <div class="form-row mb-3" style="gap: 10px;">
+          <input type="text" id="cover-search-input" placeholder="Nome do jogo ou CUSA..." style="flex: 1;">
+          <button class="btn btn-primary" id="btn-cover-search-exec">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+            <span>Buscar</span>
+          </button>
+        </div>
+
+        <!-- Loading state -->
+        <div id="cover-search-loading" style="display: none; text-align: center; padding: 30px;">
+          <div class="spinner"></div>
+          <p class="mt-2 text-muted">Buscando artes na Sony PlayStation e no SteamGridDB...</p>
+        </div>
+
+        <!-- Results Container -->
+        <div id="cover-search-results">
+          <!-- Sony TMDB section -->
+          <div id="sony-cover-section" class="mb-4" style="display: none;">
+            <h4 class="mb-2" style="font-size: 14px; color: var(--neon-cyan); display: flex; align-items: center; gap: 6px;">
+              <span>🎮 Capa Oficial PlayStation Store (Sony TMDB)</span>
+            </h4>
+            <div class="card p-3" style="display: flex; gap: 16px; align-items: center; background: rgba(0, 229, 255, 0.05); border-color: rgba(0, 229, 255, 0.2);">
+              <img id="sony-cover-preview" src="" alt="Capa Oficial Sony" style="width: 80px; height: 80px; border-radius: 8px; object-fit: cover;">
+              <div style="flex: 1;">
+                <strong style="display: block;">Ícone Original 512x512</strong>
+                <span class="text-muted text-sm">Resolução nativa oficial da PlayStation Network</span>
+              </div>
+              <button class="btn btn-primary btn-sm" id="btn-apply-sony-cover">
+                Aplicar Oficial
+              </button>
+            </div>
+          </div>
+
+          <!-- SteamGridDB section -->
+          <div id="sgdb-cover-section">
+            <h4 class="mb-2" style="font-size: 14px; color: var(--neon-purple); display: flex; align-items: center; justify-content: space-between;">
+              <span>🎨 Artes & Pôsteres da Comunidade (SteamGridDB)</span>
+              <span class="badge" id="sgdb-count-badge">0 encontradas</span>
+            </h4>
+
+            <div id="sgdb-no-key-banner" class="card p-3 mb-3 text-center" style="display: none; background: rgba(168, 85, 247, 0.08); border-color: rgba(168, 85, 247, 0.25);">
+              <p class="text-sm">Para liberar milhares de capas estilizadas da comunidade SteamGridDB, configure sua chave gratuita nas Configurações.</p>
+              <a href="https://www.steamgriddb.com/profile/preferences/api" target="_blank" rel="noopener" class="btn btn-outline btn-sm mt-2" style="display: inline-flex; align-items: center; gap: 6px;">
+                <span>Obter Chave Gratuita no SteamGridDB</span>
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6m4-3h6v6m-11 5L21 3"/></svg>
+              </a>
+            </div>
+
+            <div id="sgdb-grid-container" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 12px;">
+              <!-- Rendered dynamically -->
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer" style="padding: 14px 24px; display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--border-subtle);">
+        <button class="btn btn-outline btn-sm" onclick="triggerLocalFileUpload()">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4m17-5l-5-5m0 0l-5 5m5-5v12"/></svg>
+          <span>Upload do PC</span>
+        </button>
+        <button class="btn btn-outline btn-sm" onclick="closeModal('modal-cover-search')">Fechar</button>
       </div>
     </div>
   </div>
