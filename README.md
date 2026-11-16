@@ -49,17 +49,27 @@ Ele se conecta diretamente ao seu **PlayStation 4** através da rede local (Wi-F
 * Filtro automático por jogo com capas em miniatura.
 * Lightbox em tela cheia com botão de download em alta resolução direto para o seu computador.
 
-### 7. 🎨 Troca de Capas dos Jogos (Custom Covers)
-* Altere a arte de capa de qualquer jogo (`icon0.png`) diretamente pela interface web com upload instantâneo para o console.
+### 7. 🎨 Troca de Capas e Fundos dos Jogos (Custom Covers)
+* Busque artes oficiais da **PlayStation Store (Sony)** e milhares de capas da comunidade no **SteamGridDB** (chave gratuita), ou envie uma imagem do PC.
+* Escolha o jogo certo no SteamGridDB, filtre por capas quadradas / grades / banners e veja a **pré-visualização exata** antes de aplicar.
+* A imagem é convertida automaticamente para o formato que o PS4 usa: `icon0.png` 512×512 **e** `icon0.dds` (DXT1), que é o arquivo que a tela inicial realmente desenha. Também é possível trocar o fundo (`pic1`, 1920×1080).
+* **Backup automático** da arte original no PC, com botão "Restaurar Capa Original".
+* Obs.: o PS4 pode só mostrar a capa nova depois de reiniciar o console.
 
 ### 8. 🚨 Backup de Emergência do Banco de Dados (app.db)
 * Baixe com 1 clique uma cópia íntegra de segurança do `app.db` (`/system_data/priv/mms/app.db`) do seu PS4 para prevenir perda de biblioteca.
 
 ### 9. 🔔 Notificações na TV (Notify OSD)
-* Envie mensagens personalizadas que pipocam imediatamente na tela da TV enquanto você estiver jogando no PlayStation 4.
+* Envie mensagens personalizadas que pipocam na tela da TV enquanto você estiver jogando no PlayStation 4.
+* **Requer o payload `ps4debug` carregado** (porta `744`). Carregue-o pelo menu de Payloads do GoldHEN (se a sua versão tiver) ou envie o `ps4debug.bin` pela aba *Payloads & Ações*.
+* A porta `9090` (BinLoader) **não** serve para notificações: ela só aceita payloads executáveis. Versões anteriores deste app mandavam o texto da mensagem para a 9090, e por isso nada aparecia na TV.
 
 ### 10. ⚡ Instalador Remoto de Pacotes (RPI)
-* Dispare a instalação remota de PKGs servidos em rede diretamente na porta `12800` do GoldHEN sem precisar copiar o instalador para o HD interno antes.
+* Com o app **Remote Package Installer** (flatz) aberto no PS4 (porta `12800`), instale PKGs pela rede **direto de uma pasta do seu PC**, sem copiar para o HD antes e sem ocupar espaço em dobro. Mostra o progresso da instalação.
+* Também aceita uma URL http de um `.pkg` em qualquer servidor da rede.
+
+### 10.1 🩺 Diagnóstico de Portas
+* Testa de uma vez FTP (2121), BinLoader (9090), ps4debug (744) e Remote Package Installer (12800) e mostra o que está aberto.
 
 ### 11. 📱 Acesso pelo Celular (Mobile First)
 * Interface 100% responsiva com **Bottom Navigation Bar** tátil no estilo app nativo.
@@ -106,12 +116,18 @@ O aplicativo conta com suporte bilíngue nativo com troca instantânea no cabeç
    * **No Computador:** `http://localhost:5000`
    * **No Celular / Tablet:** `http://<IP_DO_SEU_PC>:5000` (ou escaneie o QR Code na tela).
 4. Na aba **Configurações**, informe o IP do seu PlayStation 4 (ex: `192.168.1.100`) e clique em Salvar!
+5. *(Opcional, uma vez só)* Para acessar pelo celular e para o PS4 conseguir baixar PKGs do seu PC, execute `liberar-rede.bat` (ele pede permissão de administrador, reserva a porta e libera no Firewall apenas para redes privadas).
+
+## 🐢 Está lento? Leia isto
+* O servidor FTP do GoldHEN é simples e sensível à rede. O Orbis Web Manager agora mantém **uma única conexão aberta e reaproveitada**, guarda nomes, tempo de jogo e capas em cache no PC e atualiza tudo em segundo plano. Depois do primeiro carregamento, a biblioteca abre na hora.
+* Se ainda estiver lento, teste a rede: no Prompt de Comando, rode `ping -n 30 IP_DO_PS4`. **Qualquer perda de pacotes** deixa o FTP muito lento (cada pacote perdido custa segundos). Prefira **cabo de rede** no PS4 ou Wi-Fi 5 GHz perto do roteador.
 
 ---
 
 ## 🛠️ Arquitetura & Tecnologia
 * **Zero Dependências Externas:** Não requer Node.js, Python, npm ou pip instalados. Compilado nativamente com o compilador C# (`csc.exe`) do próprio Windows.
-* **Alta Performance:** Servidor multi-thread assíncrono baseado em `HttpListener` e streaming direto de sockets.
+* **Alta Performance:** Servidor multi-thread baseado em `HttpListener`, cliente FTP próprio com conexão persistente e fila com prioridade (o que você clica passa na frente da atualização em segundo plano), cache em disco (`cache/titles.json`, `stats.json`, `games.json`, `icons/`).
+* **Código-fonte:** `src/Program.cs` (servidor e rotas), `src/Ftp.cs` (cliente FTP), `src/Library.cs` (biblioteca e cache), `src/Covers.cs` (capas, PNG/DDS), `src/Ps4Services.cs` (notificação, payload, RPI, portas). O `start.bat` recompila automaticamente.
 * **Design System:** Tema PlayStation Dark Nebula com CSS3 moderno, glassmorphism e animações fluidas.
 
 ---

@@ -4,15 +4,15 @@
 const state = {
   currentTab: 'dashboard',
   currentPath: '/data/',
-  ps4Ip: '192.168.18.54',
-  ftpPort: 2121,
   games: [],
   cheats: [],
   pkgs: [],
   captures: [],
   captureGames: [],
   selectedCaptureGame: '',
-  selectedGameIdForCover: null,
+  summary: null,
+  config: null,
+  detailId: null,
   status: null,
   localIps: [],
   lang: localStorage.getItem('owm_lang') || 'pt'
@@ -262,6 +262,48 @@ function setLanguage(lang) {
   updateTabTitles(state.currentTab);
 }
 
+// ================= HELPERS =================
+const esc = (s) => String(s === undefined || s === null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+async function api(url, opts = {}) {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), opts.timeout || 90000);
+  try {
+    const res = await fetch(url, { ...opts, signal: ctrl.signal });
+    const ct = res.headers.get('content-type') || '';
+    const data = ct.includes('json') ? await res.json() : null;
+    if (!res.ok) throw new Error((data && data.error) || `Erro HTTP ${res.status}`);
+    return data;
+  } catch (e) {
+    if (e.name === 'AbortError') throw new Error('O console demorou demais para responder.');
+    throw e;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+function postJson(url, body, opts = {}) {
+  return api(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body || {}), ...opts });
+}
+
+function fmtPlaytime(min) {
+  min = min || 0;
+  const h = Math.floor(min / 60), m = min % 60;
+  return h > 0 ? `${h}h ${m}m` : `${m}m`;
+}
+
+const CATEGORY_NAMES = { gd: 'Jogo', gde: 'App', gdc: 'App', gp: 'Jogo + atualização', ac: 'DLC', bd: 'Blu-ray', gdk: 'App' };
+const PLACEHOLDER_ICON = "data:image/svg+xml," + encodeURIComponent("<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' fill='#111827'/><text x='50' y='55' fill='#64748b' font-size='11' font-family='sans-serif' text-anchor='middle'>Sem Capa</text></svg>");
+
+// Broken images get a placeholder (delegated, works for dynamically created <img>)
+document.addEventListener('error', (e) => {
+  const img = e.target;
+  if (img && img.tagName === 'IMG' && img.dataset.icon !== undefined && !img.classList.contains('noimg')) {
+    img.classList.add('noimg');
+    img.src = PLACEHOLDER_ICON;
+  }
+}, true);
+
 // ================= INITIALIZATION =================
 document.addEventListener('DOMContentLoaded', () => {
   initI18n();
@@ -269,16 +311,18 @@ document.addEventListener('DOMContentLoaded', () => {
   initDragAndDrop();
   initModals();
   initForms();
-  
-  // Initial data fetches
+  initActions();
+
   fetchStatus();
+  fetchSummary();
   fetchGames();
   fetchNetworkInfo();
 
-  // Status polling interval (every 10s)
-  setInterval(fetchStatus, 10000);
+  // Light polling, only while the tab is visible
+  setInterval(() => { if (document.visibilityState === 'visible') fetchStatus(); }, 8000);
+  setInterval(() => { if (document.visibilityState === 'visible') fetchSummary(); }, 30000);
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') fetchStatus(); });
 
-  // Auto-launch interactive onboarding tutorial on first visit
   if (!localStorage.getItem('owm_tour_completed')) {
     setTimeout(startTour, 1200);
   }
@@ -286,134 +330,87 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // ================= NAVIGATION =================
 function initNavigation() {
-  const navItems = document.querySelectorAll('.nav-item, .mobile-nav-item');
-  navItems.forEach(item => {
+  document.querySelectorAll('.nav-item, .mobile-nav-item').forEach(item => {
     item.addEventListener('click', () => {
-      const tab = item.getAttribute('data-tab');
-      switchTab(tab);
+      switchTab(item.getAttribute('data-tab'));
+      document.body.classList.remove('sidebar-open');
     });
   });
 
-  // Action buttons that trigger tabs
-  document.querySelectorAll('[data-tab-trigger]').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const tab = btn.getAttribute('data-tab-trigger');
-      switchTab(tab);
-    });
+  document.addEventListener('click', (e) => {
+    const trg = e.target.closest('[data-tab-trigger]');
+    if (trg) {
+      e.preventDefault();
+      switchTab(trg.getAttribute('data-tab-trigger'));
+      if (trg.id === 'dash-port-payload') testPorts();
+    }
+    if (document.body.classList.contains('sidebar-open') && !e.target.closest('.sidebar') && !e.target.closest('#mobile-menu-toggle')) {
+      document.body.classList.remove('sidebar-open');
+    }
   });
 
-  // Action buttons on Dashboard
-  document.getElementById('action-upload-pkg').addEventListener('click', () => {
-    state.currentPath = '/data/pkg/';
-    document.getElementById('pkg-file-input').click();
-  });
+  const menuBtn = document.getElementById('mobile-menu-toggle');
+  if (menuBtn) menuBtn.addEventListener('click', () => document.body.classList.toggle('sidebar-open'));
 
-  document.getElementById('action-upload-cheat').addEventListener('click', () => {
-    state.currentPath = '/data/GoldHEN/cheats/json/';
-    document.getElementById('cheat-file-input').click();
-  });
+  document.getElementById('action-upload-pkg').addEventListener('click', () => document.getElementById('pkg-file-input').click());
+  document.getElementById('action-upload-cheat').addEventListener('click', () => document.getElementById('cheat-file-input').click());
+  document.getElementById('action-browse-files').addEventListener('click', () => switchTab('files'));
+  document.getElementById('action-convert-cheat').addEventListener('click', () => openModal('modal-converter'));
+  document.getElementById('btn-quick-upload').addEventListener('click', () => document.getElementById('generic-file-input').click());
+  document.getElementById('btn-qr-mobile').addEventListener('click', () => openModal('modal-qr'));
 
-  document.getElementById('action-browse-files').addEventListener('click', () => {
-    switchTab('files');
-  });
-
-  document.getElementById('action-convert-cheat').addEventListener('click', () => {
-    openModal('modal-converter');
-  });
-
-  document.getElementById('btn-quick-upload').addEventListener('click', () => {
-    document.getElementById('generic-file-input').click();
-  });
-
-  document.getElementById('btn-qr-mobile').addEventListener('click', () => {
-    openModal('modal-qr');
-  });
-
-  document.getElementById('btn-refresh-games').addEventListener('click', () => {
-    fetchGames();
-    showToast('Biblioteca recarregada.', 'info');
+  document.getElementById('btn-refresh-games').addEventListener('click', (e) => {
+    const deep = e.shiftKey;
+    fetchGames(deep ? 'deep' : 'refresh');
+    showToast(deep ? 'Atualização completa iniciada (nomes e capas).' : 'Atualizando biblioteca...', 'info');
   });
 
   document.getElementById('btn-refresh-captures').addEventListener('click', () => {
-    loadCaptures(state.selectedCaptureGame);
-    showToast('Capturas atualizadas.', 'info');
+    state.captureGames = [];
+    loadCaptures(state.selectedCaptureGame, true);
   });
 
-  // Pix Copy Button
   const btnCopyPix = document.getElementById('btn-copy-pix');
   if (btnCopyPix) {
     btnCopyPix.addEventListener('click', () => {
       const pixKey = '94af8068-d112-4c69-bcfa-8789b233246e';
       if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(pixKey).then(() => {
-          showToast('Chave Pix copiada com sucesso! Obrigado pelo apoio! ❤️', 'success');
-        }).catch(() => {
-          showToast(`Chave Pix: ${pixKey}`, 'info');
-        });
+        navigator.clipboard.writeText(pixKey)
+          .then(() => showToast('Chave Pix copiada com sucesso! Obrigado pelo apoio! ❤️', 'success'))
+          .catch(() => showToast(`Chave Pix: ${pixKey}`, 'info'));
       } else {
         showToast(`Chave Pix: ${pixKey}`, 'info');
       }
     });
   }
 
-  // Notify TV Button
-  const btnSendNotify = document.getElementById('btn-send-notify');
-  if (btnSendNotify) {
-    btnSendNotify.addEventListener('click', async () => {
-      const input = document.getElementById('notify-msg-input');
-      const msg = input.value.trim();
-      if (!msg) {
-        showToast('Digite uma mensagem para a notificação.', 'error');
-        return;
-      }
-      try {
-        const res = await fetch('/api/system/notify', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ message: msg })
-        });
-        const d = await res.json();
-        if (d.success) {
-          showToast('Notificação enviada para a tela do PS4!', 'success');
-        } else {
-          showToast(d.error || 'Falha ao enviar notificação.', 'error');
-        }
-      } catch (e) {
-        showToast('Erro ao comunicar com console.', 'error');
-      }
-    });
-  }
+  // Notification to the TV (ps4debug)
+  document.getElementById('btn-send-notify').addEventListener('click', async (e) => {
+    const btn = e.currentTarget;
+    const msg = document.getElementById('notify-msg-input').value.trim();
+    if (!msg) return showToast('Digite uma mensagem para a notificação.', 'error');
+    btn.disabled = true;
+    try {
+      const d = await postJson('/api/system/notify', { message: msg });
+      if (d.success) showToast('Notificação enviada para a tela do PS4!', 'success');
+      else showToast(d.error || 'Falha ao enviar notificação.', 'error', 8000);
+    } catch (err) {
+      showToast(err.message, 'error');
+    } finally {
+      btn.disabled = false;
+    }
+  });
 
-  // RPI Trigger Button
-  const btnTriggerRpi = document.getElementById('btn-trigger-rpi');
-  if (btnTriggerRpi) {
-    btnTriggerRpi.addEventListener('click', async () => {
-      const input = document.getElementById('rpi-pkg-url');
-      const url = input.value.trim();
-      if (!url) {
-        showToast('Informe a URL do arquivo .pkg na rede.', 'error');
-        return;
-      }
-      showToast('Enviando comando para o Package Installer (12800)...', 'info');
-      try {
-        const res = await fetch('/api/system/rpi', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ url: url })
-        });
-        const d = await res.json();
-        if (d.success) {
-          showToast('Instalação iniciada em segundo plano no PS4!', 'success');
-        } else {
-          showToast(d.error || 'Porta 12800 não respondeu. Certifique-se que o Package Installer está ativo.', 'error');
-        }
-      } catch (e) {
-        showToast('Erro na requisição RPI.', 'error');
-      }
-    });
-  }
+  // RPI with URL
+  document.getElementById('btn-trigger-rpi').addEventListener('click', async () => {
+    const url = document.getElementById('rpi-pkg-url').value.trim();
+    if (!url) return showToast('Informe a URL do arquivo .pkg na rede.', 'error');
+    await startRpiInstall({ url });
+  });
 
-  // Language Toggle Button
+  document.getElementById('btn-test-ports').addEventListener('click', testPorts);
+  document.getElementById('btn-refresh-pcpkgs').addEventListener('click', loadPcPkgs);
+
   const btnLang = document.getElementById('btn-lang-toggle');
   if (btnLang) {
     btnLang.addEventListener('click', () => {
@@ -423,48 +420,28 @@ function initNavigation() {
     });
   }
 
-  // Tutorial / Tour Button & Controls
   const btnTour = document.getElementById('btn-tour-start');
-  if (btnTour) {
-    btnTour.addEventListener('click', () => {
-      startTour();
-    });
-  }
-
+  if (btnTour) btnTour.addEventListener('click', startTour);
   const tourCloseBtn = document.getElementById('tour-close-btn');
   if (tourCloseBtn) tourCloseBtn.addEventListener('click', closeTour);
-
   const tourBackdrop = document.getElementById('tour-backdrop');
   if (tourBackdrop) tourBackdrop.addEventListener('click', closeTour);
-
   const tourPrevBtn = document.getElementById('tour-prev-btn');
   if (tourPrevBtn) tourPrevBtn.addEventListener('click', () => showTourStep(currentTourStep - 1));
-
   const tourNextBtn = document.getElementById('tour-next-btn');
   if (tourNextBtn) tourNextBtn.addEventListener('click', () => showTourStep(currentTourStep + 1));
 
-  // Online Cover Search Trigger
-  const btnCoverSearch = document.getElementById('btn-cover-search-exec');
-  if (btnCoverSearch) {
-    btnCoverSearch.addEventListener('click', () => {
-      const q = document.getElementById('cover-search-input').value.trim();
-      if (q && state.selectedGameIdForCover) {
-        searchCoversOnline(state.selectedGameIdForCover, q);
-      }
-    });
-  }
-
-  const coverSearchInput = document.getElementById('cover-search-input');
-  if (coverSearchInput) {
-    coverSearchInput.addEventListener('keypress', (e) => {
-      if (e.key === 'Enter') {
-        const q = coverSearchInput.value.trim();
-        if (q && state.selectedGameIdForCover) {
-          searchCoversOnline(state.selectedGameIdForCover, q);
-        }
-      }
-    });
-  }
+  // Cover search
+  document.getElementById('btn-cover-search-exec').addEventListener('click', () => runCoverSearch());
+  document.getElementById('cover-search-input').addEventListener('keydown', (e) => { if (e.key === 'Enter') runCoverSearch(); });
+  document.getElementById('sgdb-game-select').addEventListener('change', loadSgdbArt);
+  document.getElementById('sgdb-kind-select').addEventListener('change', loadSgdbArt);
+  document.querySelectorAll('#cover-target-seg .seg-btn').forEach(b => b.addEventListener('click', () => setCoverTarget(b.dataset.value)));
+  document.querySelectorAll('#cover-fit-seg .seg-btn').forEach(b => b.addEventListener('click', () => {
+    state.cover.fit = b.dataset.value;
+    document.querySelectorAll('#cover-fit-seg .seg-btn').forEach(x => x.classList.toggle('active', x === b));
+  }));
+  document.getElementById('btn-cover-confirm').addEventListener('click', confirmCoverApply);
 }
 
 function updateTabTitles(tabId) {
@@ -480,7 +457,6 @@ function updateTabTitles(tabId) {
     settings: { title: d.title_settings, sub: d.sub_settings },
     donate: { title: d.title_donate, sub: d.sub_donate }
   };
-
   const t = titleMap[tabId] || titleMap.dashboard;
   const titleEl = document.getElementById('page-title-text');
   const subEl = document.getElementById('page-subtitle-text');
@@ -490,41 +466,54 @@ function updateTabTitles(tabId) {
 
 function switchTab(tabId) {
   state.currentTab = tabId;
-
-  // Update nav buttons
   document.querySelectorAll('.nav-item, .mobile-nav-item').forEach(el => {
     el.classList.toggle('active', el.getAttribute('data-tab') === tabId);
   });
-
-  // Update panes
   document.querySelectorAll('.tab-pane').forEach(pane => {
     pane.classList.toggle('active', pane.id === `pane-${tabId}`);
   });
-
-  // Update Topbar Titles
   updateTabTitles(tabId);
 
-  // Trigger lazy loading per tab
   if (tabId === 'files') loadFiles(state.currentPath);
   if (tabId === 'cheats') loadCheats();
-  if (tabId === 'pkgs') loadPkgs();
-  if (tabId === 'media') loadCaptures();
+  if (tabId === 'pkgs') { loadPkgs(); loadPcPkgs(); }
+  if (tabId === 'media') loadCaptures(state.selectedCaptureGame);
+  if (tabId === 'settings') loadConfig();
+}
+
+// ================= DELEGATED ACTIONS (dynamic lists) =================
+function initActions() {
+  document.addEventListener('click', (e) => {
+    const el = e.target.closest('[data-action]');
+    if (!el) return;
+    const a = el.dataset.action;
+    const p = el.dataset.path;
+    switch (a) {
+      case 'open-game': openGameDetails(el.dataset.id); break;
+      case 'change-cover': e.stopPropagation(); triggerCoverChange(el.dataset.id, 'icon'); break;
+      case 'open-dir': loadFiles(p); break;
+      case 'delete': e.stopPropagation(); deleteItem(p, el.dataset.dir === 'true'); break;
+      case 'rename': e.stopPropagation(); renameItem(p); break;
+      case 'view-cheat': viewCheat(p); break;
+      case 'capture-game': loadCaptures(el.dataset.id); break;
+      case 'capture': openLightbox(el.dataset.full, el.dataset.title); break;
+      case 'pc-install': startRpiInstall({ file: el.dataset.name }); break;
+      case 'cover-pick': previewCover(el.dataset.url, el.dataset.target || state.cover.target); break;
+      default: return;
+    }
+  });
 }
 
 // ================= API CALLS =================
 
-// 1. Status
+// 1. Status (fast: ping + FTP keep-alive)
 async function fetchStatus() {
   try {
-    const res = await fetch('/api/status');
-    const data = await res.json();
+    const data = await api('/api/status', { timeout: 15000 });
     state.status = data;
 
     const pingIndicator = document.getElementById('ping-indicator');
     const pingVal = pingIndicator.querySelector('.ping-val');
-    const userDisplay = document.getElementById('user-display');
-    const ipDisplay = document.getElementById('ip-display');
-
     if (data.online) {
       pingVal.textContent = data.ping >= 0 ? `${data.ping} ms` : 'Online';
       pingIndicator.style.borderColor = 'rgba(0, 230, 118, 0.4)';
@@ -533,533 +522,746 @@ async function fetchStatus() {
       pingIndicator.style.borderColor = 'rgba(255, 61, 113, 0.4)';
     }
 
-    userDisplay.textContent = data.username || 'PlayStation 4';
-    ipDisplay.textContent = `${data.ip}:${data.ftpPort}`;
-
+    document.getElementById('ip-display').textContent = `${data.ip}:${data.ftpPort}`;
     const dashStatus = document.getElementById('dash-online-status');
-    dashStatus.textContent = data.online ? 'Online • Conectado' : 'Console Desconectado';
-    dashStatus.style.color = data.online ? 'var(--accent-green)' : 'var(--accent-red)';
+    dashStatus.textContent = data.online ? (data.ftpOk ? 'Online • Conectado' : 'Online • FTP desligado') : 'Console Desconectado';
+    dashStatus.style.color = data.online && data.ftpOk ? 'var(--accent-green)' : (data.online ? 'var(--accent-amber)' : 'var(--accent-red)');
 
-    document.getElementById('dash-banner').textContent = data.banner || 'GoldHEN FTP Server';
-    document.getElementById('dash-user').textContent = data.username || 'PlayStation 4';
-
+    document.getElementById('dash-banner').textContent = data.transfer ? `⏳ ${data.transfer}...` : (data.banner || 'GoldHEN FTP Server');
     const fwBadge = document.getElementById('dash-fw-badge');
-    if (fwBadge) {
-      const fw = data.fw || '9.00';
-      const hen = data.goldhenVer || 'GoldHEN v2.2';
-      fwBadge.textContent = `FW: ${fw} • ${hen}`;
-    }
+    if (fwBadge) fwBadge.textContent = `FW: ${data.fw || '?'} • ${data.goldhenVer || 'GoldHEN'}`;
+    document.getElementById('dash-port-ftp').textContent = data.ftpOk ? `FTP ${data.ftpPort}: ${data.ftpBusy ? 'Ocupado' : 'Ativo'}` : `FTP ${data.ftpPort}: Inativo`;
 
-    // Populate user profile options in settings if users detected
-    if (data.users && data.users.length > 0) {
-      const userSelect = document.getElementById('cfg-active-user');
-      if (userSelect && userSelect.options.length <= 1) {
-        data.users.forEach(u => {
-          const opt = document.createElement('option');
-          opt.value = u.name;
-          opt.textContent = `${u.name} (${u.id})${u.isCurrent ? ' [Ativo]' : ''}`;
-          if (u.isCurrent) opt.selected = true;
-          userSelect.appendChild(opt);
-        });
-      }
-    }
+    document.querySelectorAll('.lan-warning').forEach(el => el.style.display = data.lanAccess ? 'none' : 'block');
+  } catch (err) {
+    const pingVal = document.querySelector('#ping-indicator .ping-val');
+    if (pingVal) pingVal.textContent = 'Sem servidor';
+  }
+}
 
-    document.getElementById('dash-port-ftp').textContent = data.ftpOk ? `FTP ${data.ftpPort}: Ativo` : `FTP ${data.ftpPort}: Inativo`;
-    document.getElementById('dash-port-payload').textContent = data.payloadPortOk ? `Porta ${data.payloadPort}: Aberta` : `Porta ${data.payloadPort}: Fechada`;
-
+// 2. Summary (users, cheats, pkgs) - cached on the server
+async function fetchSummary(force) {
+  try {
+    const data = await api('/api/summary' + (force ? '?force=1' : ''), { timeout: 60000 });
+    state.summary = data;
+    document.getElementById('user-display').textContent = data.username || 'PlayStation 4';
+    document.getElementById('dash-user').textContent = data.username || 'PlayStation 4';
     document.getElementById('dash-pkg-count').textContent = `${data.pkgCount || 0} pacotes em /data/pkg/`;
     document.getElementById('dash-pkg-size').textContent = formatBytes(data.totalPkgSize || 0);
     document.getElementById('pkgs-count-badge').textContent = data.pkgCount || 0;
     document.getElementById('cheats-count-badge').textContent = data.cheatCount || 0;
+    const cheatsBadge = document.getElementById('dash-active-cheats');
+    if (cheatsBadge) cheatsBadge.textContent = `${data.cheatCount || 0} cheats instalados`;
 
+    const userSelect = document.getElementById('cfg-active-user');
+    if (userSelect && data.users && data.users.length > 0) {
+      const current = userSelect.value;
+      userSelect.innerHTML = `<option value="">Auto-detectar (Mais Recente)</option>` +
+        data.users.map(u => `<option value="${esc(u.name)}">${esc(u.name)} (${esc(u.id)})${u.isCurrent ? ' • ativo' : ''}</option>`).join('');
+      userSelect.value = current || (state.config && state.config.active_user) || '';
+    }
+  } catch (err) { /* console offline: keep previous values */ }
+}
+
+// 3. Games (served from cache instantly, refreshed in background)
+let gamesPollTimer = null;
+async function fetchGames(mode) {
+  const statusEl = document.getElementById('games-status');
+  if (!state.games.length) {
+    const c = document.getElementById('games-container');
+    if (c) c.innerHTML = `<div class="loading-state"><div class="spinner"></div><span>Lendo a biblioteca do console...</span></div>`;
+  }
+  try {
+    const q = mode === 'deep' ? '?deep=1' : (mode === 'refresh' ? '?refresh=1' : '');
+    const data = await api('/api/games' + q, { timeout: 180000 });
+    state.games = data.games || [];
+    document.getElementById('dash-games-count').textContent = state.games.length;
+    document.getElementById('games-count-badge').textContent = state.games.length;
+    applyGamesView();
+    renderRecentGames(state.games.slice(0, 8));
+
+    if (statusEl) {
+      if (data.refreshing) statusEl.innerHTML = `<span class="spinner small"></span>Atualizando com o console...`;
+      else if (data.error) statusEl.innerHTML = `<span class="text-danger">Não foi possível atualizar: ${esc(data.error)}</span>`;
+      else statusEl.textContent = data.updated ? `${state.games.length} títulos • atualizado às ${data.updated}` : '';
+    }
+
+    clearTimeout(gamesPollTimer);
+    if (data.refreshing) gamesPollTimer = setTimeout(() => fetchGames(), 1500);
   } catch (err) {
-    console.error('Status fetch error:', err);
+    if (statusEl) statusEl.innerHTML = `<span class="text-danger">${esc(err.message)}</span>`;
+    if (!state.games.length) {
+      document.getElementById('games-container').innerHTML = `<div class="empty-state">Não foi possível ler a biblioteca. Verifique o IP do PS4 em Configurações e se o FTP do GoldHEN está ativo.</div>`;
+      document.getElementById('dash-recent-games').innerHTML = `<span class="text-muted">Console não conectado.</span>`;
+    }
   }
 }
 
-// 2. Games
-async function fetchGames() {
-  try {
-    const res = await fetch('/api/games');
-    const games = await res.json();
-    state.games = games;
+function applyGamesView() {
+  const q = (document.getElementById('games-search-input').value || '').toLowerCase();
+  const sort = document.getElementById('games-sort').value;
+  let list = state.games.filter(g => !q || (g.name || '').toLowerCase().includes(q) || g.id.toLowerCase().includes(q));
+  list = list.slice();
+  if (sort === 'name') list.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+  else if (sort === 'starts') list.sort((a, b) => b.gameStarts - a.gameStarts);
+  else if (sort === 'recent') list.sort((a, b) => parseFtpDate(b.installedDate) - parseFtpDate(a.installedDate));
+  renderGames(list);
+}
 
-    document.getElementById('dash-games-count').textContent = games.length;
-    document.getElementById('games-count-badge').textContent = games.length;
-
-    renderGames(games);
-    renderRecentGames(games.slice(0, 8));
-  } catch (err) {
-    console.error('Games fetch error:', err);
-  }
+function parseFtpDate(s) {
+  const t = Date.parse(s || '');
+  return isNaN(t) ? 0 : t;
 }
 
 function renderGames(games) {
   const container = document.getElementById('games-container');
   if (!container) return;
-
   if (games.length === 0) {
-    container.innerHTML = `<div class="empty-state">Nenhum jogo encontrado no console. Verifique a conexão com o PS4.</div>`;
+    container.innerHTML = `<div class="empty-state">Nenhum jogo encontrado.</div>`;
     return;
   }
-
-  container.innerHTML = games.map(game => {
-    const hours = Math.floor(game.timePlayedMinutes / 60);
-    const mins = game.timePlayedMinutes % 60;
-    const timeStr = hours > 0 ? `${hours}h ${mins}m` : `${mins}m`;
-
-    return `
-      <div class="game-card" id="game-card-${game.id}">
-        <div class="game-cover-box">
-          <img id="game-img-${game.id}" src="${game.iconUrl}" alt="${game.name}" loading="lazy" onerror="this.src='data:image/svg+xml,<svg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 100 100\' fill=\'%23111827\'><rect width=\'100\' height=\'100\'/><text x=\'50\' y=\'55\' fill=\'%2364748b\' font-size=\'12\' text-anchor=\'middle\'>Sem Capa</text></svg>'">
-          ${game.hasCheats ? `<span class="game-badge-cheat">CHEATS</span>` : ''}
-          <button class="btn-change-cover" onclick="triggerCoverChange('${game.id}', event)" title="Alterar a capa deste jogo">
-            <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg>
-            <span>Trocar Capa</span>
-          </button>
-        </div>
-        <div class="game-body">
-          <div class="game-id-tag">${game.id}</div>
-          <h4 class="game-title" title="${game.name}">${game.name}</h4>
-          <div class="game-stats-row">
-            <span>Tempo: <strong>${timeStr}</strong></span>
-            <span>Iniciado: <strong>${game.gameStarts}x</strong></span>
-          </div>
+  container.innerHTML = games.map(game => `
+    <div class="game-card" data-action="open-game" data-id="${esc(game.id)}">
+      <div class="game-cover-box">
+        <img data-icon="${esc(game.id)}" src="${esc(game.iconUrl)}" alt="" loading="lazy">
+        ${game.hasCheats ? `<span class="game-badge-cheat">CHEATS</span>` : ''}
+        ${game.customCover ? `<span class="game-badge-custom" title="Capa personalizada (original guardado)">CUSTOM</span>` : ''}
+        <button class="btn-change-cover" data-action="change-cover" data-id="${esc(game.id)}" title="Alterar a capa deste jogo">
+          <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg>
+          <span>Trocar Capa</span>
+        </button>
+      </div>
+      <div class="game-body">
+        <div class="game-id-tag">${esc(game.id)}${game.version ? ` • v${esc(game.version)}` : ''}</div>
+        <h4 class="game-title" title="${esc(game.name)}">${esc(game.name)}</h4>
+        <div class="game-stats-row">
+          <span>Tempo: <strong>${fmtPlaytime(game.timePlayedMinutes)}</strong></span>
+          <span>Iniciado: <strong>${game.gameStarts}x</strong></span>
         </div>
       </div>
-    `;
-  }).join('');
+    </div>
+  `).join('');
 }
 
 function renderRecentGames(games) {
   const container = document.getElementById('dash-recent-games');
   if (!container) return;
-
   if (games.length === 0) {
-    container.innerHTML = `<span>Nenhum jogo jogado recentemente.</span>`;
+    container.innerHTML = `<span class="text-muted">Nenhum jogo encontrado.</span>`;
     return;
   }
-
-  container.innerHTML = games.map(game => {
-    const hours = Math.floor(game.timePlayedMinutes / 60);
-    const mins = game.timePlayedMinutes % 60;
-    const timeStr = hours > 0 ? `${hours}h ${mins}m` : `${mins}m`;
-
-    return `
-      <div class="game-card-mini" onclick="switchTab('games')">
-        <div class="cover-wrap">
-          <img src="${game.iconUrl}" alt="${game.name}" loading="lazy">
-        </div>
-        <div class="info">
-          <div class="title" title="${game.name}">${game.name}</div>
-          <div class="meta">
-            <span>${game.id}</span>
-            <span>${timeStr}</span>
-          </div>
+  container.innerHTML = games.map(game => `
+    <div class="game-card-mini" data-action="open-game" data-id="${esc(game.id)}">
+      <div class="cover-wrap">
+        <img data-icon="${esc(game.id)}" src="${esc(game.iconUrl)}" alt="" loading="lazy">
+      </div>
+      <div class="info">
+        <div class="title" title="${esc(game.name)}">${esc(game.name)}</div>
+        <div class="meta">
+          <span>${esc(game.id)}</span>
+          <span>${fmtPlaytime(game.timePlayedMinutes)}</span>
         </div>
       </div>
-    `;
-  }).join('');
+    </div>
+  `).join('');
+}
+
+function refreshIconEverywhere(id, url) {
+  document.querySelectorAll(`img[data-icon="${CSS.escape(id)}"]`).forEach(img => {
+    img.classList.remove('noimg');
+    img.src = url;
+  });
+  const g = state.games.find(x => x.id === id);
+  if (g) g.iconUrl = url;
+}
+
+// ================= GAME DETAILS =================
+async function openGameDetails(id) {
+  const game = state.games.find(g => g.id === id) || { id, name: id };
+  state.detailId = id;
+  document.getElementById('gd-icon').src = game.iconUrl || '';
+  document.getElementById('gd-icon').dataset.icon = id;
+  document.getElementById('gd-title').textContent = game.name || id;
+  document.getElementById('gd-sub').textContent = id;
+  document.getElementById('gd-stats').innerHTML = `<div class="loading-state"><div class="spinner"></div></div>`;
+  document.getElementById('gd-cheats').innerHTML = '';
+  document.getElementById('gd-btn-download').href = game.iconUrl || '#';
+  document.getElementById('gd-btn-download').setAttribute('download', `${id}_icon0.png`);
+  document.getElementById('gd-btn-cover').onclick = () => triggerCoverChange(id, 'icon');
+  document.getElementById('gd-btn-bg').onclick = () => triggerCoverChange(id, 'background');
+  document.getElementById('gd-btn-files').onclick = () => { closeModal('modal-game'); switchTab('files'); loadFiles(`/user/appmeta/${id}/`); };
+  const restoreBtn = document.getElementById('gd-btn-restore');
+  restoreBtn.style.display = game.customCover ? '' : 'none';
+  restoreBtn.onclick = () => restoreCover(id);
+  openModal('modal-game');
+
+  try {
+    const d = await api(`/api/game/details?id=${encodeURIComponent(id)}`);
+    const stat = (label, value) => `<div class="gd-stat"><span>${label}</span><strong>${esc(value)}</strong></div>`;
+    document.getElementById('gd-sub').textContent = [id, d.contentId].filter(Boolean).join(' • ');
+    document.getElementById('gd-stats').innerHTML =
+      stat('Tempo jogado', fmtPlaytime(game.timePlayedMinutes)) +
+      stat('Inicializações', `${game.gameStarts || 0}x`) +
+      stat('Versão', d.version || '—') +
+      stat('Tipo', CATEGORY_NAMES[d.category] || d.category || '—') +
+      stat('Jogo base', d.appSize ? formatBytes(d.appSize) : '—') +
+      stat('Atualização', d.patchSize ? formatBytes(d.patchSize) : '—');
+    restoreBtn.style.display = d.customCover ? '' : 'none';
+    document.getElementById('gd-btn-bg').style.display = d.hasPic1 ? '' : 'none';
+    document.getElementById('gd-cheats').innerHTML = d.cheats && d.cheats.length
+      ? `<div class="info-box"><strong>Cheats instalados:</strong> ${d.cheats.map(esc).join(', ')}</div>`
+      : '';
+  } catch (err) {
+    document.getElementById('gd-stats').innerHTML = `<div class="text-danger">${esc(err.message)}</div>`;
+  }
 }
 
 // ================= COVER CHANGER =================
-function triggerCoverChange(gameId, event) {
-  if (event) event.stopPropagation();
-  state.selectedGameIdForCover = gameId;
+state.cover = { id: null, title: '', target: 'icon', fit: 'cover', sgdbGames: [], pendingUrl: null, pendingFile: null };
 
-  let gameTitle = gameId;
-  if (state.games && state.games.length > 0) {
-    const found = state.games.find(g => g.id === gameId);
-    if (found && found.name) gameTitle = found.name;
+function triggerCoverChange(gameId, target) {
+  const g = state.games.find(x => x.id === gameId);
+  openCoverSearchModal(gameId, g && g.name ? g.name : gameId, target || 'icon');
+}
+
+function setCoverTarget(target) {
+  state.cover.target = target;
+  document.querySelectorAll('#cover-target-seg .seg-btn').forEach(x => x.classList.toggle('active', x.dataset.value === target));
+  const kind = document.getElementById('sgdb-kind-select');
+  if (kind) {
+    const desired = target === 'background' ? 'heroes' : 'square';
+    if (kind.value !== desired && (kind.value === 'heroes' || target === 'background')) {
+      kind.value = desired;
+      loadSgdbArt();
+    }
   }
-
-  openCoverSearchModal(gameId, gameTitle);
+  if (state.cover.lastSearch) renderSony(state.cover.lastSearch.sony);
 }
 
 function triggerLocalFileUpload() {
-  closeModal('modal-cover-search');
   const input = document.getElementById('cover-file-input');
   input.value = '';
   input.click();
 }
 
-function openCoverSearchModal(gameId, gameTitle) {
-  state.selectedGameIdForCover = gameId;
-  state.selectedGameTitleForCover = gameTitle;
-
-  const titleEl = document.getElementById('modal-cover-title');
-  const subEl = document.getElementById('modal-cover-sub');
-  const inputEl = document.getElementById('cover-search-input');
-
-  if (titleEl) titleEl.textContent = `Buscar Capa - ${gameTitle}`;
-  if (subEl) subEl.textContent = `Title ID: ${gameId}`;
-  if (inputEl) inputEl.value = gameTitle;
-
+function openCoverSearchModal(gameId, gameTitle, target) {
+  state.cover.id = gameId;
+  state.cover.title = gameTitle;
+  state.cover.lastSearch = null;
+  document.getElementById('modal-cover-title').textContent = `Trocar Arte • ${gameTitle}`;
+  document.getElementById('modal-cover-sub').textContent = `Title ID: ${gameId}`;
+  document.getElementById('cover-search-input').value = gameTitle;
+  document.getElementById('sgdb-kind-select').value = target === 'background' ? 'heroes' : 'square';
+  setCoverTarget(target || 'icon');
   openModal('modal-cover-search');
-  searchCoversOnline(gameId, gameTitle);
+  runCoverSearch();
 }
 
-async function searchCoversOnline(gameId, searchTitle) {
+async function runCoverSearch() {
+  const id = state.cover.id;
+  const title = document.getElementById('cover-search-input').value.trim();
   const loading = document.getElementById('cover-search-loading');
   const results = document.getElementById('cover-search-results');
-  const sonySec = document.getElementById('sony-cover-section');
-  const sgdbGrid = document.getElementById('sgdb-grid-container');
-  const sgdbBadge = document.getElementById('sgdb-count-badge');
-  const noKeyBanner = document.getElementById('sgdb-no-key-banner');
-
-  if (loading) loading.style.display = 'block';
-  if (results) results.style.display = 'none';
-  if (sonySec) sonySec.style.display = 'none';
-  if (sgdbGrid) sgdbGrid.innerHTML = '';
-
+  loading.style.display = 'block';
+  results.style.display = 'none';
   try {
-    const res = await fetch(`/api/game/covers/search?id=${encodeURIComponent(gameId)}&title=${encodeURIComponent(searchTitle)}`);
-    const data = await res.json();
+    const data = await api(`/api/covers/search?id=${encodeURIComponent(id)}&title=${encodeURIComponent(title)}`);
+    state.cover.lastSearch = data;
+    renderSony(data.sony);
 
-    if (loading) loading.style.display = 'none';
-    if (results) results.style.display = 'block';
-
-    // 1. Sony Official TMDB
-    if (data.sony && data.sony.available && data.sony.icon) {
-      if (sonySec) sonySec.style.display = 'block';
-      const previewImg = document.getElementById('sony-cover-preview');
-      if (previewImg) previewImg.src = data.sony.icon;
-      const btnApplySony = document.getElementById('btn-apply-sony-cover');
-      if (btnApplySony) {
-        btnApplySony.onclick = () => applyCoverOnline(gameId, data.sony.icon);
-      }
-    }
-
-    // 2. SteamGridDB
-    if (!data.steamgriddb.hasKey) {
-      if (noKeyBanner) noKeyBanner.style.display = 'block';
-      if (sgdbBadge) sgdbBadge.textContent = 'Requer Chave';
+    const s = data.steamgriddb;
+    const noKey = document.getElementById('sgdb-no-key-banner');
+    const filters = document.getElementById('sgdb-filters');
+    const badge = document.getElementById('sgdb-count-badge');
+    if (!s.hasKey) {
+      noKey.style.display = 'block';
+      filters.style.display = 'none';
+      badge.textContent = 'Requer chave';
+      document.getElementById('sgdb-grid-container').innerHTML = '';
     } else {
-      if (noKeyBanner) noKeyBanner.style.display = 'none';
-      const grids = data.steamgriddb.grids || [];
-      if (sgdbBadge) sgdbBadge.textContent = `${grids.length} encontradas`;
-
-      if (grids.length === 0) {
-        if (sgdbGrid) {
-          sgdbGrid.innerHTML = `<p class="text-muted text-sm" style="grid-column: 1 / -1;">Nenhuma arte encontrada para "${searchTitle}". Tente simplificar o nome na barra de busca acima.</p>`;
-        }
+      noKey.style.display = 'none';
+      filters.style.display = s.games.length ? 'flex' : 'none';
+      const sel = document.getElementById('sgdb-game-select');
+      sel.innerHTML = s.games.map(g => `<option value="${esc(g.id)}">${esc(g.name)}${g.year ? ` (${esc(g.year)})` : ''}</option>`).join('');
+      if (s.selectedGameId) sel.value = s.selectedGameId;
+      if (s.error) {
+        badge.textContent = 'Erro';
+        document.getElementById('sgdb-grid-container').innerHTML = `<p class="text-danger text-sm" style="grid-column: 1 / -1;">${esc(s.error)}</p>`;
+      } else if (!s.games.length) {
+        badge.textContent = '0 encontradas';
+        document.getElementById('sgdb-grid-container').innerHTML = `<p class="text-muted text-sm" style="grid-column: 1 / -1;">Nenhum jogo encontrado para "${esc(title)}". Tente um nome mais curto (ex: sem subtítulo).</p>`;
+      } else if (document.getElementById('sgdb-kind-select').value === 'square') {
+        renderSgdb(s.grids);
       } else {
-        if (sgdbGrid) {
-          sgdbGrid.innerHTML = grids.map(g => `
-            <div class="sgdb-card" style="position: relative; border-radius: 8px; overflow: hidden; background: var(--bg-surface-elevated); border: 1px solid var(--border-subtle); display: flex; flex-direction: column;">
-              <div style="aspect-ratio: 2/3; overflow: hidden; position: relative;">
-                <img src="${g.thumb || g.url}" alt="Arte" loading="lazy" style="width: 100%; height: 100%; object-fit: cover;">
-                <button class="btn btn-primary btn-sm" onclick="applyCoverOnline('${gameId}', '${g.url}')" style="position: absolute; bottom: 8px; left: 8px; right: 8px; opacity: 0.95; font-size: 11px; padding: 6px;">
-                  Aplicar
-                </button>
-              </div>
-              <div style="padding: 6px 8px; font-size: 11px;" class="text-muted text-truncate">
-                Por: ${g.author || 'Comunidade'}
-              </div>
-            </div>
-          `).join('');
-        }
+        loadSgdbArt();
       }
     }
   } catch (err) {
-    if (loading) loading.style.display = 'none';
-    if (results) results.style.display = 'block';
-    showToast('Erro ao buscar capas online: ' + err.message, 'error');
+    showToast('Erro ao buscar capas: ' + err.message, 'error');
+  } finally {
+    loading.style.display = 'none';
+    results.style.display = 'block';
   }
 }
 
-async function applyCoverOnline(gameId, imageUrl) {
-  showToast(`Baixando e aplicando capa para ${gameId}...`, 'info');
+function renderSony(sony) {
+  const sec = document.getElementById('sony-cover-section');
+  const row = document.getElementById('sony-cover-row');
+  if (!sony || (!sony.icon && !sony.background)) { sec.style.display = 'none'; return; }
+  sec.style.display = 'block';
+  let html = '';
+  if (sony.icon) html += `
+    <div class="sony-item">
+      <img src="${esc(sony.icon)}" alt="">
+      <div class="grow"><strong>Ícone oficial</strong><br><span class="text-muted">PlayStation Store</span></div>
+      <button class="btn btn-primary btn-sm" data-action="cover-pick" data-target="icon" data-url="${esc(sony.icon)}">Usar como capa</button>
+    </div>`;
+  if (sony.background) html += `
+    <div class="sony-item">
+      <img class="wide" src="${esc(sony.background)}" alt="">
+      <div class="grow"><strong>Fundo oficial</strong><br><span class="text-muted">1920×1080</span></div>
+      <button class="btn btn-outline btn-sm" data-action="cover-pick" data-target="background" data-url="${esc(sony.background)}">Usar como fundo</button>
+    </div>`;
+  row.innerHTML = html;
+}
+
+async function loadSgdbArt() {
+  const gameId = document.getElementById('sgdb-game-select').value;
+  const kind = document.getElementById('sgdb-kind-select').value;
+  const container = document.getElementById('sgdb-grid-container');
+  if (!gameId) return;
+  container.innerHTML = `<div class="loading-state"><div class="spinner"></div></div>`;
   try {
-    const res = await fetch('/api/game/covers/apply', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: gameId, url: imageUrl })
-    });
-    const data = await res.json();
-    if (data.success) {
-      showToast(`Capa do jogo ${gameId} atualizada com sucesso!`, 'success');
-      const img = document.getElementById(`game-img-${gameId}`);
-      if (img) img.src = data.iconUrl;
-      closeModal('modal-cover-search');
-    } else {
-      showToast(`Falha ao aplicar capa: ${data.error}`, 'error');
-    }
+    const d = await api(`/api/covers/sgdb?gameId=${encodeURIComponent(gameId)}&kind=${encodeURIComponent(kind)}`);
+    renderSgdb(d.grids || [], kind);
   } catch (err) {
-    showToast(`Erro ao aplicar capa: ${err.message}`, 'error');
+    container.innerHTML = `<p class="text-danger text-sm" style="grid-column: 1 / -1;">${esc(err.message)}</p>`;
   }
 }
 
-async function uploadNewCover(file, gameId) {
-  if (!file || !gameId) return;
+function renderSgdb(grids, kind) {
+  kind = kind || document.getElementById('sgdb-kind-select').value;
+  const container = document.getElementById('sgdb-grid-container');
+  document.getElementById('sgdb-count-badge').textContent = `${grids.length} encontradas`;
+  container.classList.toggle('wide', kind === 'heroes');
+  if (!grids.length) {
+    container.innerHTML = `<p class="text-muted text-sm" style="grid-column: 1 / -1;">Nenhuma arte deste tipo. Tente outro tipo no filtro acima ou outro jogo da lista.</p>`;
+    return;
+  }
+  container.innerHTML = grids.map(g => {
+    const ratio = g.width && g.height ? g.width / g.height : 1;
+    const shape = ratio > 1.6 ? 'wide' : (ratio < 0.85 ? 'tall' : '');
+    return `
+      <div class="sgdb-card ${shape}" data-action="cover-pick" data-url="${esc(g.url)}" title="Clique para pré-visualizar">
+        <div class="art"><img src="${esc(g.thumb || g.url)}" alt="" loading="lazy"></div>
+        <div class="meta"><span class="text-truncate">${esc(g.author || 'Comunidade')}</span><span>${g.width}×${g.height}</span></div>
+      </div>`;
+  }).join('');
+}
 
-  showToast(`Enviando nova capa para ${gameId}...`, 'info');
-
+async function previewCover(url, target) {
+  state.cover.pendingUrl = url;
+  state.cover.pendingFile = null;
+  state.cover.pendingTarget = target;
+  const img = document.getElementById('cover-preview-img');
+  document.getElementById('cover-preview-desc').textContent = target === 'background'
+    ? 'Assim ficará o fundo (pic1) no PS4:' : 'Assim ficará a capa no PS4 (512×512):';
+  img.src = '';
+  openModal('modal-cover-preview');
   try {
-    const res = await fetch(`/api/game/icon/upload?id=${encodeURIComponent(gameId)}`, {
-      method: 'POST',
-      body: file
+    const res = await fetch('/api/covers/preview', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url, target, fit: state.cover.fit })
     });
-    const data = await res.json();
-
-    if (data.success) {
-      showToast(`Capa do jogo ${gameId} alterada com sucesso!`, 'success');
-      const img = document.getElementById(`game-img-${gameId}`);
-      if (img) {
-        img.src = `${data.iconUrl}`;
-      }
-    } else {
-      showToast(`Falha ao alterar capa: ${data.error}`, 'error');
+    if (!res.ok) {
+      const d = await res.json().catch(() => ({}));
+      throw new Error(d.error || 'Falha ao gerar pré-visualização');
     }
+    img.src = URL.createObjectURL(await res.blob());
   } catch (err) {
-    showToast(`Erro ao enviar capa: ${err.message}`, 'error');
+    closeModal('modal-cover-preview');
+    showToast(err.message, 'error');
   }
 }
 
-// 3. File Explorer
+async function confirmCoverApply() {
+  const { id, pendingUrl, pendingFile, pendingTarget, fit } = state.cover;
+  const btn = document.getElementById('btn-cover-confirm');
+  btn.disabled = true;
+  showToast('Enviando arte para o PS4...', 'info');
+  try {
+    let d;
+    if (pendingFile) {
+      d = await api(`/api/game/icon/upload?id=${encodeURIComponent(id)}&target=${encodeURIComponent(pendingTarget)}&fit=${encodeURIComponent(fit)}`, { method: 'POST', body: pendingFile });
+    } else {
+      d = await postJson('/api/covers/apply', { id, url: pendingUrl, target: pendingTarget, fit });
+    }
+    closeModal('modal-cover-preview');
+    closeModal('modal-cover-search');
+    showToast(pendingTarget === 'background'
+      ? 'Fundo aplicado! Reinicie o PS4 se ele não mudar na hora.'
+      : 'Capa aplicada! Reinicie o PS4 se ela não mudar na hora.', 'success', 6000);
+    refreshIconEverywhere(id, d.iconUrl);
+    const g = state.games.find(x => x.id === id);
+    if (g) g.customCover = true;
+    applyGamesView();
+    if (state.detailId === id && document.getElementById('modal-game').classList.contains('active')) openGameDetails(id);
+  } catch (err) {
+    showToast('Falha ao aplicar: ' + err.message, 'error', 7000);
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+async function restoreCover(id) {
+  if (!confirm('Restaurar a capa original deste jogo?')) return;
+  try {
+    const d = await postJson('/api/covers/restore', { id, target: 'icon' });
+    try { await postJson('/api/covers/restore', { id, target: 'background' }); } catch (e) { /* no background backup */ }
+    showToast('Arte original restaurada!', 'success');
+    refreshIconEverywhere(id, d.iconUrl);
+    const g = state.games.find(x => x.id === id);
+    if (g) g.customCover = false;
+    applyGamesView();
+    openGameDetails(id);
+  } catch (err) {
+    showToast(err.message, 'error');
+  }
+}
+
+// ================= FILE EXPLORER =================
 async function loadFiles(dirPath) {
+  if (!dirPath.endsWith('/')) dirPath += '/';
   state.currentPath = dirPath;
   const tbody = document.getElementById('file-table-body');
-  tbody.innerHTML = `<tr><td colspan="4" class="p-4 text-center">Carregando diretório...</td></tr>`;
-
+  tbody.innerHTML = `<tr><td colspan="4" class="p-4 text-center"><span class="spinner small"></span>Carregando...</td></tr>`;
   renderBreadcrumb(dirPath);
 
   try {
-    const res = await fetch(`/api/files?path=${encodeURIComponent(dirPath)}`);
-    const data = await res.json();
-
+    const data = await api(`/api/files?path=${encodeURIComponent(dirPath)}`);
+    if (state.currentPath !== dirPath) return; // user navigated away meanwhile
     const items = data.items || [];
     if (items.length === 0) {
       tbody.innerHTML = `<tr><td colspan="4" class="p-4 text-center text-muted">Pasta vazia</td></tr>`;
       return;
     }
-
     tbody.innerHTML = items.map(item => {
-      const fullPath = (dirPath.endsWith('/') ? dirPath : dirPath + '/') + item.name;
-      const sizeStr = item.isDir ? '--' : formatBytes(item.size);
-
+      const fullPath = dirPath + item.name;
+      const p = esc(item.isDir ? fullPath + '/' : fullPath);
       return `
         <tr>
           <td>
-            <div class="file-name-cell" onclick="${item.isDir ? `loadFiles('${fullPath}/')` : `previewOrDownload('${fullPath}')`}">
+            <div class="file-name-cell" ${item.isDir ? `data-action="open-dir" data-path="${p}"` : ''}>
               <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke-width="2" class="file-icon ${item.isDir ? 'folder' : ''}">
                 ${item.isDir ? '<path d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/>' : '<path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8zM14 2v6h6"/>'}
               </svg>
-              <span>${item.name}</span>
+              <span>${esc(item.name)}</span>
             </div>
           </td>
-          <td style="font-family: monospace;">${sizeStr}</td>
-          <td style="color: var(--text-muted);">${item.date}</td>
-          <td style="text-align: right;">
+          <td style="font-family: monospace;">${item.isDir ? '--' : formatBytes(item.size)}</td>
+          <td style="color: var(--text-muted);">${esc(item.date)}</td>
+          <td style="text-align: right; white-space: nowrap;">
             ${!item.isDir ? `
               <a href="/api/files/download?path=${encodeURIComponent(fullPath)}" class="btn btn-sm btn-outline" title="Baixar">
                 <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
-              </a>
-            ` : ''}
-            <button class="btn btn-sm btn-danger" onclick="deleteItem('${fullPath}', ${item.isDir})" title="Excluir">
+              </a>` : ''}
+            <button class="btn btn-sm btn-outline" data-action="rename" data-path="${esc(fullPath)}" title="Renomear">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+            </button>
+            <button class="btn btn-sm btn-danger" data-action="delete" data-path="${esc(fullPath)}" data-dir="${item.isDir}" title="Excluir">
               <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
             </button>
           </td>
-        </tr>
-      `;
+        </tr>`;
     }).join('');
-
   } catch (err) {
-    tbody.innerHTML = `<tr><td colspan="4" class="p-4 text-center text-danger">Erro ao listar arquivos: ${err.message}. Verifique o IP do PS4 nas Configurações.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="4" class="p-4 text-center text-danger">Erro ao listar: ${esc(err.message)}</td></tr>`;
   }
 }
 
 function renderBreadcrumb(dirPath) {
   const container = document.getElementById('file-breadcrumb');
   const parts = dirPath.split('/').filter(p => p.length > 0);
-  
-  let html = `<span class="crumb" onclick="loadFiles('/')">PS4</span>`;
+  let html = `<span class="crumb" data-action="open-dir" data-path="/">PS4</span>`;
   let accum = '/';
   for (const part of parts) {
     accum += part + '/';
-    html += ` / <span class="crumb" onclick="loadFiles('${accum}')">${part}</span>`;
+    html += ` / <span class="crumb" data-action="open-dir" data-path="${esc(accum)}">${esc(part)}</span>`;
   }
   container.innerHTML = html;
-
   document.querySelectorAll('.path-chip').forEach(chip => {
     chip.classList.toggle('active', chip.getAttribute('data-path') === dirPath);
   });
 }
 
-// 4. Cheats
+async function renameItem(path) {
+  const oldName = path.split('/').pop();
+  const newName = prompt('Novo nome:', oldName);
+  if (!newName || newName === oldName) return;
+  if (newName.includes('/')) return showToast('O nome não pode conter "/".', 'error');
+  const to = path.substring(0, path.length - oldName.length) + newName;
+  try {
+    await api(`/api/files/rename?from=${encodeURIComponent(path)}&to=${encodeURIComponent(to)}`, { method: 'POST' });
+    showToast('Renomeado!', 'success');
+    loadFiles(state.currentPath);
+  } catch (err) {
+    showToast('Falha ao renomear: ' + err.message, 'error');
+  }
+}
+
+// ================= CHEATS =================
 async function loadCheats() {
   const container = document.getElementById('cheats-container');
-  container.innerHTML = `<div class="p-4 text-center">Carregando cheats instalados...</div>`;
-
+  container.innerHTML = `<div class="loading-state"><div class="spinner"></div><span>Carregando cheats instalados...</span></div>`;
   try {
-    const res = await fetch('/api/cheats');
-    const cheats = await res.json();
+    const cheats = await api('/api/cheats');
+    // Cheats for installed games first
+    cheats.sort((a, b) => (b.installed - a.installed) || (a.gameName || '').localeCompare(b.gameName || ''));
     state.cheats = cheats;
-
+    document.getElementById('cheats-count-badge').textContent = cheats.length;
     if (cheats.length === 0) {
-      container.innerHTML = `<div class="p-4 text-center text-muted">Nenhum cheat encontrado em /data/GoldHEN/cheats/json/.</div>`;
+      container.innerHTML = `<div class="empty-state">Nenhum cheat encontrado em /data/GoldHEN/cheats/json/.</div>`;
       return;
     }
-
     renderCheatsList(cheats);
-
   } catch (err) {
-    container.innerHTML = `<div class="p-4 text-danger">Erro ao carregar cheats: ${err.message}. Verifique a conexão com o PS4.</div>`;
+    container.innerHTML = `<div class="empty-state text-danger">Erro ao carregar cheats: ${esc(err.message)}</div>`;
   }
 }
 
 function renderCheatsList(cheats) {
   const container = document.getElementById('cheats-container');
-  container.innerHTML = cheats.map(c => {
-    return `
-      <div class="cheat-card" onclick="viewCheat('${c.path}', '${c.titleId}', '${c.gameName}', '${c.version}')">
-        <div class="c-top">
-          <div>
-            <div class="c-id">${c.titleId} • v${c.version}</div>
-            <div class="c-title">${c.gameName}</div>
-          </div>
-          <span class="badge cheat">JSON</span>
+  const MAX = 300;
+  const shown = cheats.slice(0, MAX);
+  container.innerHTML = shown.map(c => `
+    <div class="cheat-card" data-action="view-cheat" data-path="${esc(c.path)}">
+      <div class="c-top">
+        <div>
+          <div class="c-id">${esc(c.titleId)} • v${esc(c.version)}${c.installed ? ' • <span style="color:var(--accent-green)">instalado</span>' : ''}</div>
+          <div class="c-title">${esc(c.gameName)}</div>
         </div>
-        <div style="font-size: 11px; color: var(--text-muted); display: flex; justify-content: space-between;">
-          <span>Arquivo: ${c.filename}</span>
-          <span>${formatBytes(c.size)}</span>
-        </div>
+        <span class="badge cheat">JSON</span>
       </div>
-    `;
-  }).join('');
+      <div style="font-size: 11px; color: var(--text-muted); display: flex; justify-content: space-between; gap: 8px;">
+        <span class="text-truncate">${esc(c.filename)}</span>
+        <span>${formatBytes(c.size)}</span>
+      </div>
+    </div>
+  `).join('') + (cheats.length > MAX ? `<div class="empty-state">Mostrando ${MAX} de ${cheats.length}. Use a busca para filtrar.</div>` : '');
 }
 
-async function viewCheat(path, titleId, gameName, version) {
+async function viewCheat(path) {
+  const c = state.cheats.find(x => x.path === path) || { titleId: '', gameName: path, version: '' };
   try {
-    const res = await fetch(`/api/cheat/read?path=${encodeURIComponent(path)}`);
-    const json = await res.json();
+    const json = await api(`/api/cheat/read?path=${encodeURIComponent(path)}`);
     const data = json.data;
-
-    document.getElementById('cheat-view-title').textContent = gameName || titleId;
+    document.getElementById('cheat-view-title').textContent = c.gameName || c.titleId;
     document.getElementById('cheat-view-meta').innerHTML = `
-      <span class="badge-ps4">${titleId}</span>
-      <span class="badge outline">Versão: ${version}</span>
-      <span class="badge outline">Processo: ${data ? data.process : 'eboot.bin'}</span>
-      ${data && data.credits ? `<span class="badge">Créditos: ${data.credits.join(', ')}</span>` : ''}
+      <span class="badge-ps4">${esc(c.titleId)}</span>
+      <span class="badge outline">Versão: ${esc(c.version)}</span>
+      <span class="badge outline">Processo: ${esc(data && data.process ? data.process : 'eboot.bin')}</span>
+      ${data && Array.isArray(data.credits) ? `<span class="badge">Créditos: ${esc(data.credits.join(', '))}</span>` : ''}
     `;
-
     const modsList = document.getElementById('cheat-view-mods');
-    if (data && data.mods && data.mods.length > 0) {
-      modsList.innerHTML = data.mods.map((mod, i) => `
+    if (data && Array.isArray(data.mods) && data.mods.length > 0) {
+      modsList.innerHTML = data.mods.map(mod => `
         <div class="card p-3 mb-2" style="background: rgba(255,255,255,0.02); border-radius: 8px;">
-          <div style="display: flex; justify-content: space-between; align-items: center;">
-            <strong>${mod.name}</strong>
-            <span class="badge" style="background: var(--ps-blue); color: #fff;">${mod.type}</span>
+          <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px;">
+            <strong>${esc(mod.name)}</strong>
+            <span class="badge" style="background: var(--ps-blue); color: #fff;">${esc(mod.type)}</span>
           </div>
-          <div style="font-size: 11px; color: var(--text-muted); margin-top: 6px;">
-            Offsets de memória: ${mod.memory ? mod.memory.map(m => m.offset).join(', ') : 'N/A'}
+          <div style="font-size: 11px; color: var(--text-muted); margin-top: 6px; overflow-wrap: anywhere;">
+            Offsets: ${esc(Array.isArray(mod.memory) ? mod.memory.map(m => m.offset).join(', ') : 'N/A')}
           </div>
         </div>
       `).join('');
     } else {
-      modsList.innerHTML = `<pre style="font-size: 12px; background: rgba(0,0,0,0.4); padding: 12px; border-radius: 6px; overflow: auto; max-height: 300px;">${json.raw}</pre>`;
+      modsList.innerHTML = `<pre style="font-size: 12px; background: rgba(0,0,0,0.4); padding: 12px; border-radius: 6px; overflow: auto; max-height: 300px;">${esc(json.raw)}</pre>`;
     }
-
     openModal('modal-cheat-view');
   } catch (err) {
     showToast(`Erro ao ler cheat: ${err.message}`, 'error');
   }
 }
 
-// 5. PKGs
+// ================= PKGs =================
 async function loadPkgs() {
   const container = document.getElementById('pkgs-container');
-  container.innerHTML = `<div class="p-4 text-center">Listando pacotes em /data/pkg/...</div>`;
-
+  container.innerHTML = `<div class="loading-state"><div class="spinner"></div><span>Listando /data/pkg/...</span></div>`;
   try {
-    const res = await fetch('/api/pkgs');
-    const pkgs = await res.json();
+    const pkgs = await api('/api/pkgs');
     state.pkgs = pkgs;
-
     if (pkgs.length === 0) {
-      container.innerHTML = `<div class="p-4 text-center text-muted">Nenhum pacote .pkg encontrado em /data/pkg/. Use o botão acima para enviar.</div>`;
+      container.innerHTML = `<div class="empty-state">Nenhum .pkg em /data/pkg/. Use o botão acima para enviar.</div>`;
       return;
     }
-
     container.innerHTML = pkgs.map(pkg => `
       <div class="pkg-card">
-        <div class="pkg-title">${pkg.name}</div>
+        <div class="pkg-title">${esc(pkg.name)}</div>
         <div class="pkg-meta">
           <span>Tamanho: <strong>${formatBytes(pkg.size)}</strong></span>
-          <span>${pkg.date}</span>
+          <span>${esc(pkg.date)}</span>
         </div>
         <div style="display: flex; gap: 8px; margin-top: 8px;">
           <a href="/api/files/download?path=${encodeURIComponent(pkg.path)}" class="btn btn-sm btn-outline flex-1 text-center">Baixar</a>
-          <button class="btn btn-sm btn-danger" onclick="deleteItem('${pkg.path}', false)">Excluir</button>
+          <button class="btn btn-sm btn-danger" data-action="delete" data-path="${esc(pkg.path)}" data-dir="false">Excluir</button>
         </div>
       </div>
     `).join('');
-
   } catch (err) {
-    container.innerHTML = `<div class="p-4 text-danger">Erro ao carregar PKGs: ${err.message}</div>`;
+    container.innerHTML = `<div class="empty-state text-danger">Erro ao carregar PKGs: ${esc(err.message)}</div>`;
   }
 }
 
-// 6. CAPTURES GALLERY (MÍDIA DO PS4)
-async function loadCaptures(gameFilter = '') {
-  state.selectedCaptureGame = gameFilter;
+async function loadPcPkgs() {
+  const info = document.getElementById('pcpkgs-info');
+  const container = document.getElementById('pcpkgs-container');
+  try {
+    const d = await api('/api/pc/pkgs');
+    if (!d.folder) {
+      info.innerHTML = `Configure a <strong>pasta de PKGs do PC</strong> em <a href="#" class="link" data-tab-trigger="settings">Configurações</a> para listar os arquivos aqui.`;
+      container.innerHTML = '';
+      return;
+    }
+    if (!d.exists) {
+      info.innerHTML = `A pasta <code>${esc(d.folder)}</code> não existe neste PC.`;
+      container.innerHTML = '';
+      return;
+    }
+    info.innerHTML = (d.lanAccess
+      ? `Pasta: <code>${esc(d.folder)}</code> • o PS4 vai baixar de <code>${esc(d.serverUrl)}</code>. Deixe o <strong>Remote Package Installer</strong> aberto no PS4.`
+      : `<span style="color:var(--accent-amber)">O acesso pela rede está desativado — o PS4 não conseguirá baixar. Execute <code>liberar-rede.bat</code> uma vez e reabra o programa.</span>`);
+    container.innerHTML = d.files.length ? d.files.map(f => `
+      <div class="pkg-card">
+        <div class="pkg-title">${esc(f.name)}</div>
+        <div class="pkg-meta">
+          <span>Tamanho: <strong>${formatBytes(f.size)}</strong></span>
+          <span>${esc(f.date)}</span>
+        </div>
+        <button class="btn btn-sm btn-primary mt-2" data-action="pc-install" data-name="${esc(f.name)}" ${d.lanAccess ? '' : 'disabled'}>Instalar no PS4</button>
+      </div>
+    `).join('') : `<div class="empty-state">Nenhum .pkg nesta pasta.</div>`;
+  } catch (err) {
+    info.innerHTML = `<span class="text-danger">${esc(err.message)}</span>`;
+  }
+}
+
+// Remote Package Installer: start + progress polling
+const rpiTasks = {};
+async function startRpiInstall(body) {
+  showToast('Enviando pedido ao Remote Package Installer...', 'info');
+  try {
+    const d = await postJson('/api/system/rpi', body);
+    if (!d.success) return showToast(d.error || 'O instalador recusou o pedido.', 'error', 8000);
+    showToast(`Instalação iniciada no PS4${d.title ? `: ${d.title}` : ''}!`, 'success');
+    if (d.taskId !== null && d.taskId !== undefined) {
+      rpiTasks[d.taskId] = { title: d.title || body.file || body.url, pct: 0, text: 'Iniciando...' };
+      renderRpiTasks();
+      pollRpi(d.taskId);
+    }
+  } catch (err) {
+    showToast(err.message, 'error', 8000);
+  }
+}
+
+async function pollRpi(taskId) {
+  const t = rpiTasks[taskId];
+  if (!t) return;
+  try {
+    const p = await api(`/api/system/rpi/progress?task=${encodeURIComponent(taskId)}`, { timeout: 15000 });
+    const total = p.length_total || p.length || 0;
+    const done = p.transferred_total || p.transferred || 0;
+    if (p.status && p.status !== 'success') {
+      t.text = 'Concluído ou cancelado';
+      t.pct = total && done >= total ? 100 : t.pct;
+      t.finished = true;
+    } else {
+      t.pct = total ? Math.floor(done * 100 / total) : 0;
+      const rest = p.rest_sec_total || p.rest_sec;
+      t.text = `${formatBytes(done)} / ${formatBytes(total)}${rest ? ` • faltam ~${Math.ceil(rest / 60)} min` : ''}`;
+      if (total && done >= total) { t.finished = true; t.text = 'Instalado!'; t.pct = 100; }
+    }
+  } catch (err) {
+    t.text = 'Sem resposta do instalador'; t.finished = true;
+  }
+  renderRpiTasks();
+  if (!t.finished) setTimeout(() => pollRpi(taskId), 3000);
+}
+
+function renderRpiTasks() {
+  const html = Object.values(rpiTasks).map(t => `
+    <div class="rpi-task">
+      <strong>${esc(t.title)}</strong> — ${esc(t.text)}
+      <div class="progress-bar-wrap"><div class="progress-bar" style="width:${t.pct}%"></div></div>
+    </div>`).join('');
+  ['rpi-progress', 'pc-rpi-progress'].forEach(id => { const el = document.getElementById(id); if (el) el.innerHTML = html; });
+}
+
+// ================= PORTS =================
+async function testPorts() {
+  const box = document.getElementById('ports-result');
+  if (!box) return;
+  box.innerHTML = `<div class="text-muted text-sm"><span class="spinner small"></span>Testando...</div>`;
+  try {
+    const list = await api('/api/ports', { timeout: 20000 });
+    box.innerHTML = list.map(p => `
+      <div class="port-row ${p.open ? 'open' : ''}">
+        <span class="dot"></span>
+        <span class="pname">${esc(p.name)} <small>Porta ${p.port} • ${esc(p.use)}</small></span>
+        <span class="pstate">${p.open ? 'ABERTA' : 'FECHADA'}</span>
+      </div>`).join('');
+    const card = document.getElementById('card-ports');
+    if (card && state.currentTab === 'tools') card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  } catch (err) {
+    box.innerHTML = `<div class="text-danger text-sm">${esc(err.message)}</div>`;
+  }
+}
+
+// ================= CAPTURES =================
+async function loadCaptures(gameFilter = '', refresh = false) {
   const selector = document.getElementById('captures-game-selector');
   const container = document.getElementById('captures-container');
-
-  container.innerHTML = `<div class="p-4 text-center">Carregando capturas do console...</div>`;
-
+  container.innerHTML = `<div class="loading-state"><div class="spinner"></div><span>Carregando capturas...</span></div>`;
   try {
-    // 1. Fetch games list with captures
-    if (state.captureGames.length === 0) {
-      const gRes = await fetch('/api/captures/games');
-      state.captureGames = await gRes.json();
-    }
-
+    if (state.captureGames.length === 0) state.captureGames = await api('/api/captures/games');
     if (state.captureGames.length === 0) {
       selector.innerHTML = '';
-      container.innerHTML = `<div class="p-4 text-center text-muted">Nenhuma captura de tela encontrada em /user/av_contents/photo/.</div>`;
+      container.innerHTML = `<div class="empty-state">Nenhuma captura de tela encontrada no console.</div>`;
       return;
     }
+    if (!gameFilter || !state.captureGames.some(g => g.id === gameFilter)) gameFilter = state.captureGames[0].id;
+    state.selectedCaptureGame = gameFilter;
 
-    // Default to first game if none selected
-    if (!gameFilter && state.captureGames.length > 0) {
-      gameFilter = state.captureGames[0].id;
-      state.selectedCaptureGame = gameFilter;
-    }
-
-    // Render filter chips
     selector.innerHTML = state.captureGames.map(cg => `
-      <button class="cap-chip ${gameFilter === cg.id ? 'active' : ''}" onclick="loadCaptures('${cg.id}')">
-        ${cg.name}
-      </button>
+      <button class="cap-chip ${gameFilter === cg.id ? 'active' : ''}" data-action="capture-game" data-id="${esc(cg.id)}">${esc(cg.name)}</button>
     `).join('');
 
-    // 2. Fetch captures for selected game
-    const url = `/api/captures?game=${encodeURIComponent(gameFilter)}`;
-    const res = await fetch(url);
-    const captures = await res.json();
+    const captures = await api(`/api/captures?game=${encodeURIComponent(gameFilter)}${refresh ? '&refresh=1' : ''}`);
+    if (state.selectedCaptureGame !== gameFilter) return;
     state.captures = captures;
-
     if (captures.length === 0) {
-      container.innerHTML = `<div class="p-4 text-center text-muted">Nenhuma captura encontrada para ${gameFilter}.</div>`;
+      container.innerHTML = `<div class="empty-state">Nenhuma captura para este jogo.</div>`;
       return;
     }
-
     container.innerHTML = captures.map(c => `
-      <div class="capture-card" onclick="openLightbox('${c.imageUrl}', '${c.titleId} • ${c.fileName}')">
+      <div class="capture-card" data-action="capture" data-full="${esc(c.imageUrl)}" data-title="${esc(c.titleId + ' • ' + c.fileName)}">
         <div class="capture-img-box">
-          <img src="${c.imageUrl}" alt="${c.fileName}" loading="lazy">
+          <img src="${esc(c.thumbUrl)}" alt="" loading="lazy">
         </div>
         <div class="capture-meta">
-          <span>${c.titleId}</span>
-          <a href="${c.imageUrl}" download="${c.fileName}" class="btn btn-sm btn-outline" onclick="event.stopPropagation()">Baixar</a>
+          <span>${esc(formatCaptureDate(c.fileName))}</span>
+          <a href="${esc(c.imageUrl)}" download="${esc(c.fileName)}" class="btn btn-sm btn-outline" onclick="event.stopPropagation()">Baixar</a>
         </div>
       </div>
     `).join('');
-
   } catch (err) {
-    container.innerHTML = `<div class="p-4 text-danger">Erro ao carregar capturas de tela: ${err.message}</div>`;
+    container.innerHTML = `<div class="empty-state text-danger">Erro ao carregar capturas: ${esc(err.message)}</div>`;
   }
+}
+
+function formatCaptureDate(fileName) {
+  const m = /^(\d{4})(\d{2})(\d{2})_(\d{2})(\d{2})/.exec(fileName || '');
+  return m ? `${m[3]}/${m[2]}/${m[1]} ${m[4]}:${m[5]}` : fileName;
 }
 
 function openLightbox(imgUrl, title) {
@@ -1069,223 +1271,195 @@ function openLightbox(imgUrl, title) {
   openModal('modal-lightbox');
 }
 
-// 7. Network Info & QR
+// ================= NETWORK / QR =================
 async function fetchNetworkInfo() {
   try {
-    const res = await fetch('/api/network');
-    const net = await res.json();
+    const net = await api('/api/network');
     state.localIps = net.pcIps || [];
-
-    const bestIp = net.pcIps.length > 0 ? net.pcIps[0] : 'localhost';
+    const bestIp = state.localIps.length > 0 ? state.localIps[0] : 'localhost';
     const mobileUrl = `http://${bestIp}:${net.httpPort}`;
-
     document.getElementById('mobile-url-display').textContent = mobileUrl;
     document.getElementById('modal-qr-url').textContent = mobileUrl;
-
     const qrImg = `<img src="https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(mobileUrl)}" alt="QR Code" width="180" height="180">`;
     document.getElementById('qr-container').innerHTML = qrImg;
-    document.getElementById('modal-qr-target').innerHTML = qrImg;
+    document.getElementById('modal-qr-target').innerHTML = qrImg +
+      (net.lanAccess ? '' : `<div class="warn-box mt-3" style="text-align:left">O acesso pela rede está desativado. Feche o programa, execute <code>liberar-rede.bat</code> uma vez e abra de novo.</div>`);
+    document.querySelectorAll('.lan-warning').forEach(el => el.style.display = net.lanAccess ? 'none' : 'block');
   } catch (err) { }
 }
 
-// ================= FILE UPLOAD CONTROLLER =================
+// ================= FILE UPLOAD =================
+const uploadQueue = [];
+let uploading = false;
+
 function uploadFileToPs4(file, targetDir) {
   if (!file) return;
+  uploadQueue.push({ file, targetDir });
+  if (!uploading) processUploadQueue();
+}
 
-  const modal = document.getElementById('modal-upload');
-  const fileName = document.getElementById('upload-file-name');
-  const fileSize = document.getElementById('upload-file-size');
+function processUploadQueue() {
+  const job = uploadQueue.shift();
+  if (!job) { uploading = false; return; }
+  uploading = true;
+  const { file, targetDir } = job;
+
   const progressFill = document.getElementById('upload-progress-fill');
   const percentText = document.getElementById('upload-percent');
-  const destText = document.getElementById('upload-dest');
-
-  fileName.textContent = file.name;
-  fileSize.textContent = formatBytes(file.size);
+  document.getElementById('upload-file-name').textContent = file.name + (uploadQueue.length ? ` (+${uploadQueue.length} na fila)` : '');
+  document.getElementById('upload-file-size').textContent = formatBytes(file.size);
+  document.getElementById('upload-dest').textContent = `Destino: ${targetDir}`;
   progressFill.style.width = '0%';
   percentText.textContent = '0%';
-  destText.textContent = `Destino: ${targetDir}`;
-
   openModal('modal-upload');
 
   const xhr = new XMLHttpRequest();
-  const url = `/api/files/upload?path=${encodeURIComponent(targetDir)}&filename=${encodeURIComponent(file.name)}`;
-
-  xhr.open('POST', url, true);
-
+  xhr.open('POST', `/api/files/upload?path=${encodeURIComponent(targetDir)}&filename=${encodeURIComponent(file.name)}`, true);
+  const started = Date.now();
   xhr.upload.onprogress = (e) => {
-    if (e.lengthComputable) {
-      const pct = Math.round((e.loaded / e.total) * 100);
-      progressFill.style.width = `${pct}%`;
-      percentText.textContent = `${pct}% (${formatBytes(e.loaded)} / ${formatBytes(e.total)})`;
-    }
+    if (!e.lengthComputable) return;
+    const pct = Math.round((e.loaded / e.total) * 100);
+    const secs = (Date.now() - started) / 1000;
+    const speed = secs > 0 ? e.loaded / secs : 0;
+    progressFill.style.width = `${pct}%`;
+    percentText.textContent = `${pct}% (${formatBytes(e.loaded)} / ${formatBytes(e.total)})${speed ? ` • ${formatBytes(speed)}/s` : ''}`;
   };
-
-  xhr.onload = () => {
-    if (xhr.status === 200) {
+  const finish = (ok, msg) => {
+    if (ok) {
       progressFill.style.width = '100%';
       percentText.textContent = '100% • Concluído!';
-      showToast(`Arquivo "${file.name}" enviado com sucesso!`, 'success');
-      setTimeout(() => {
+      showToast(`"${file.name}" enviado!`, 'success');
+    } else {
+      showToast(`Falha ao enviar "${file.name}": ${msg}`, 'error', 7000);
+    }
+    setTimeout(() => {
+      if (!uploadQueue.length) {
         closeModal('modal-upload');
         if (state.currentTab === 'files') loadFiles(state.currentPath);
         if (state.currentTab === 'pkgs') loadPkgs();
         if (state.currentTab === 'cheats') loadCheats();
-      }, 1000);
-    } else {
-      showToast(`Erro no envio: ${xhr.statusText}`, 'error');
-    }
+        fetchSummary(true);
+      }
+      processUploadQueue();
+    }, ok ? 800 : 200);
   };
-
-  xhr.onerror = () => {
-    showToast('Falha na comunicação durante o upload.', 'error');
+  xhr.onload = () => {
+    let msg = xhr.statusText;
+    try { const d = JSON.parse(xhr.responseText); if (d.error) msg = d.error; } catch (e) { }
+    finish(xhr.status === 200, msg);
   };
-
+  xhr.onerror = () => finish(false, 'conexão interrompida');
   xhr.send(file);
 }
 
 // ================= DRAG AND DROP =================
 function initDragAndDrop() {
   const dropZone = document.getElementById('file-drop-zone');
-
-  ['dragenter', 'dragover'].forEach(name => {
-    dropZone.addEventListener(name, (e) => {
-      e.preventDefault();
-      dropZone.classList.add('dragover');
-    });
-  });
-
-  ['dragleave', 'drop'].forEach(name => {
-    dropZone.addEventListener(name, (e) => {
-      e.preventDefault();
-      dropZone.classList.remove('dragover');
-    });
-  });
-
+  ['dragenter', 'dragover'].forEach(name => dropZone.addEventListener(name, (e) => { e.preventDefault(); dropZone.classList.add('dragover'); }));
+  ['dragleave', 'drop'].forEach(name => dropZone.addEventListener(name, (e) => { e.preventDefault(); dropZone.classList.remove('dragover'); }));
   dropZone.addEventListener('drop', (e) => {
-    const files = e.dataTransfer.files;
-    if (files.length > 0) {
-      uploadFileToPs4(files[0], state.currentPath);
-    }
+    Array.from(e.dataTransfer.files).forEach(f => uploadFileToPs4(f, state.currentPath));
   });
 
   window.addEventListener('dragover', (e) => e.preventDefault());
   window.addEventListener('drop', (e) => {
     e.preventDefault();
     if (e.target.closest('#file-drop-zone')) return;
-
-    const files = e.dataTransfer.files;
-    if (files.length > 0) {
-      const file = files[0];
+    Array.from(e.dataTransfer.files).forEach(file => {
       let target = state.currentPath;
-      if (file.name.endsWith('.pkg')) target = '/data/pkg/';
-      if (file.name.endsWith('.json')) target = '/data/GoldHEN/cheats/json/';
+      const n = file.name.toLowerCase();
+      if (n.endsWith('.pkg')) target = '/data/pkg/';
+      else if (n.endsWith('.json')) target = '/data/GoldHEN/cheats/json/';
       uploadFileToPs4(file, target);
-    }
+    });
   });
 }
 
 // ================= MODALS & FORMS =================
 function initModals() {
   document.querySelectorAll('.modal-close').forEach(btn => {
-    btn.addEventListener('click', () => {
-      btn.closest('.modal-overlay').classList.remove('active');
+    btn.addEventListener('click', () => btn.closest('.modal-overlay').classList.remove('active'));
+  });
+  document.querySelectorAll('.modal-overlay').forEach(ov => {
+    ov.addEventListener('click', (e) => { if (e.target === ov && ov.id !== 'modal-upload') ov.classList.remove('active'); });
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape') return;
+    const open = Array.from(document.querySelectorAll('.modal-overlay.active')).filter(m => m.id !== 'modal-upload');
+    if (open.length) open[open.length - 1].classList.remove('active');
+  });
+
+  document.getElementById('btn-upload-file').addEventListener('click', () => document.getElementById('generic-file-input').click());
+  document.getElementById('btn-upload-pkg-direct').addEventListener('click', () => document.getElementById('pkg-file-input').click());
+  document.getElementById('btn-new-cheat').addEventListener('click', () => document.getElementById('cheat-file-input').click());
+
+  const multi = (id, dirFn) => {
+    const input = document.getElementById(id);
+    input.multiple = true;
+    input.addEventListener('change', (e) => {
+      Array.from(e.target.files).forEach(f => uploadFileToPs4(f, dirFn()));
+      input.value = '';
     });
-  });
+  };
+  multi('generic-file-input', () => state.currentPath);
+  multi('pkg-file-input', () => '/data/pkg/');
+  multi('cheat-file-input', () => '/data/GoldHEN/cheats/json/');
 
-  document.getElementById('btn-upload-file').addEventListener('click', () => {
-    document.getElementById('generic-file-input').click();
-  });
-
-  document.getElementById('btn-upload-pkg-direct').addEventListener('click', () => {
-    state.currentPath = '/data/pkg/';
-    document.getElementById('pkg-file-input').click();
-  });
-
-  document.getElementById('btn-new-cheat').addEventListener('click', () => {
-    state.currentPath = '/data/GoldHEN/cheats/json/';
-    document.getElementById('cheat-file-input').click();
-  });
-
-  document.getElementById('generic-file-input').addEventListener('change', (e) => {
-    if (e.target.files.length > 0) uploadFileToPs4(e.target.files[0], state.currentPath);
-  });
-
-  document.getElementById('pkg-file-input').addEventListener('change', (e) => {
-    if (e.target.files.length > 0) uploadFileToPs4(e.target.files[0], '/data/pkg/');
-  });
-
-  document.getElementById('cheat-file-input').addEventListener('change', (e) => {
-    if (e.target.files.length > 0) uploadFileToPs4(e.target.files[0], '/data/GoldHEN/cheats/json/');
-  });
-
-  // Cover image input
+  // Local image for cover: preview, then confirm
   document.getElementById('cover-file-input').addEventListener('change', (e) => {
-    if (e.target.files.length > 0 && state.selectedGameIdForCover) {
-      uploadNewCover(e.target.files[0], state.selectedGameIdForCover);
-    }
+    const file = e.target.files[0];
+    if (!file || !state.cover.id) return;
+    state.cover.pendingFile = file;
+    state.cover.pendingUrl = null;
+    state.cover.pendingTarget = state.cover.target;
+    document.getElementById('cover-preview-desc').textContent = 'Imagem escolhida (será ajustada automaticamente para o formato do PS4):';
+    document.getElementById('cover-preview-img').src = URL.createObjectURL(file);
+    openModal('modal-cover-preview');
   });
 
-  // Quick paths clicks
-  document.querySelectorAll('.path-chip').forEach(chip => {
-    chip.addEventListener('click', () => {
-      loadFiles(chip.getAttribute('data-path'));
-    });
-  });
+  document.querySelectorAll('.path-chip').forEach(chip => chip.addEventListener('click', () => loadFiles(chip.getAttribute('data-path'))));
 
-  // Search filters
-  document.getElementById('games-search-input').addEventListener('input', (e) => {
-    const q = e.target.value.toLowerCase();
-    const filtered = state.games.filter(g => g.name.toLowerCase().includes(q) || g.id.toLowerCase().includes(q));
-    renderGames(filtered);
-  });
+  document.getElementById('games-search-input').addEventListener('input', applyGamesView);
+  document.getElementById('games-sort').addEventListener('change', applyGamesView);
 
   document.getElementById('cheats-search-input').addEventListener('input', (e) => {
     const q = e.target.value.toLowerCase();
-    const filtered = state.cheats.filter(c => c.gameName.toLowerCase().includes(q) || c.titleId.toLowerCase().includes(q));
-    renderCheatsList(filtered);
+    renderCheatsList(state.cheats.filter(c => (c.gameName || '').toLowerCase().includes(q) || (c.titleId || '').toLowerCase().includes(q)));
   });
 
-  document.getElementById('btn-open-converter').addEventListener('click', () => {
-    openModal('modal-converter');
-  });
-
+  document.getElementById('btn-open-converter').addEventListener('click', () => openModal('modal-converter'));
   document.getElementById('btn-run-convert').addEventListener('click', runRegionConversion);
 }
 
 async function loadConfig() {
   try {
-    const res = await fetch('/api/config');
-    if (res.ok) {
-      const cfg = await res.json();
-      if (cfg.ps4_ip) document.getElementById('cfg-ps4-ip').value = cfg.ps4_ip;
-      if (cfg.ftp_port) document.getElementById('cfg-ftp-port').value = cfg.ftp_port;
-      if (cfg.payload_port) document.getElementById('cfg-payload-port').value = cfg.payload_port;
-      if (cfg.ps4_fw) document.getElementById('cfg-ps4-fw').value = cfg.ps4_fw;
-      if (cfg.steamgriddb_api_key) {
-        const sgdbInput = document.getElementById('cfg-sgdb-key');
-        if (sgdbInput) sgdbInput.value = cfg.steamgriddb_api_key;
-      }
-      if (cfg.active_user !== undefined && cfg.active_user !== "") {
-        const uSel = document.getElementById('cfg-active-user');
-        if (uSel) {
-          let found = false;
-          for (let i = 0; i < uSel.options.length; i++) {
-            if (uSel.options[i].value === cfg.active_user) {
-              uSel.selectedIndex = i;
-              found = true;
-              break;
-            }
-          }
-          if (!found) {
-            const opt = document.createElement('option');
-            opt.value = cfg.active_user;
-            opt.textContent = cfg.active_user;
-            opt.selected = true;
-            uSel.appendChild(opt);
-          }
-        }
-      }
+    const cfg = await api('/api/config');
+    state.config = cfg;
+    if (cfg.ps4_ip) document.getElementById('cfg-ps4-ip').value = cfg.ps4_ip;
+    if (cfg.ftp_port) document.getElementById('cfg-ftp-port').value = cfg.ftp_port;
+    if (cfg.payload_port) document.getElementById('cfg-payload-port').value = cfg.payload_port;
+    if (cfg.ps4_fw) document.getElementById('cfg-ps4-fw').value = cfg.ps4_fw;
+    document.getElementById('cfg-pc-pkg-folder').value = cfg.pc_pkg_folder || '';
+    const keyInput = document.getElementById('cfg-sgdb-key');
+    const keyState = document.getElementById('sgdb-key-state');
+    keyInput.value = '';
+    keyInput.placeholder = cfg.has_sgdb_key ? '•••••••• chave configurada (deixe em branco para manter)' : 'Insira sua chave para liberar capas da comunidade';
+    keyState.innerHTML = cfg.has_sgdb_key ? `<span style="color:var(--accent-green)">✓ Chave configurada.</span> <a href="#" class="link" id="sgdb-key-remove">remover</a> • ` : '';
+    const rm = document.getElementById('sgdb-key-remove');
+    if (rm) rm.onclick = async (e) => {
+      e.preventDefault();
+      await postJson('/api/config', { steamgriddb_api_key: '' });
+      showToast('Chave removida.', 'info');
+      loadConfig();
+    };
+    const uSel = document.getElementById('cfg-active-user');
+    if (cfg.active_user && !Array.from(uSel.options).some(o => o.value === cfg.active_user)) {
+      const opt = document.createElement('option');
+      opt.value = cfg.active_user;
+      opt.textContent = cfg.active_user;
+      uSel.appendChild(opt);
     }
+    uSel.value = cfg.active_user || '';
   } catch (err) {
     console.error('Error loading config:', err);
   }
@@ -1296,74 +1470,55 @@ function initForms() {
 
   document.getElementById('settings-form').addEventListener('submit', async (e) => {
     e.preventDefault();
-    const ip = document.getElementById('cfg-ps4-ip').value.trim();
-    const ftp = parseInt(document.getElementById('cfg-ftp-port').value);
-    const payload = parseInt(document.getElementById('cfg-payload-port').value);
-    const fw = document.getElementById('cfg-ps4-fw').value.trim();
-    const activeUser = document.getElementById('cfg-active-user').value;
-    const sgdbKey = document.getElementById('cfg-sgdb-key') ? document.getElementById('cfg-sgdb-key').value.trim() : '';
-
+    const body = {
+      ps4_ip: document.getElementById('cfg-ps4-ip').value.trim(),
+      ftp_port: parseInt(document.getElementById('cfg-ftp-port').value, 10),
+      payload_port: parseInt(document.getElementById('cfg-payload-port').value, 10),
+      ps4_fw: document.getElementById('cfg-ps4-fw').value.trim(),
+      active_user: document.getElementById('cfg-active-user').value,
+      pc_pkg_folder: document.getElementById('cfg-pc-pkg-folder').value.trim()
+    };
+    const key = document.getElementById('cfg-sgdb-key').value.trim();
+    if (key) body.steamgriddb_api_key = key;
     try {
-      const res = await fetch('/api/config', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ps4_ip: ip,
-          ftp_port: ftp,
-          payload_port: payload,
-          ps4_fw: fw,
-          active_user: activeUser,
-          steamgriddb_api_key: sgdbKey
-        })
-      });
-      if (res.ok) {
-        showToast('Configurações salvas com sucesso!', 'success');
-        fetchStatus();
-      }
+      await postJson('/api/config', body);
+      showToast('Configurações salvas!', 'success');
+      loadConfig();
+      fetchStatus();
+      fetchSummary(true);
+      fetchGames();
     } catch (err) {
-      showToast('Erro ao salvar configurações.', 'error');
+      showToast('Erro ao salvar: ' + err.message, 'error');
     }
   });
 
-  document.getElementById('btn-send-payload').addEventListener('click', async () => {
+  document.getElementById('btn-send-payload').addEventListener('click', async (e) => {
     const fileInput = document.getElementById('payload-file-input');
-    if (fileInput.files.length === 0) {
-      showToast('Selecione um arquivo .bin de payload.', 'error');
-      return;
-    }
-
+    if (fileInput.files.length === 0) return showToast('Selecione um arquivo .bin de payload.', 'error');
     const file = fileInput.files[0];
-    showToast(`Injetando payload "${file.name}" na porta 9090...`);
-
+    const btn = e.currentTarget;
+    btn.disabled = true;
+    showToast(`Enviando "${file.name}"...`, 'info');
     try {
-      const res = await fetch('/api/payload', {
-        method: 'POST',
-        body: file
-      });
-      const data = await res.json();
-      if (data.success) {
-        showToast(data.message, 'success');
-      } else {
-        showToast(data.error, 'error');
-      }
+      const data = await api('/api/payload', { method: 'POST', body: file });
+      showToast(data.message, 'success');
     } catch (err) {
-      showToast(`Falha na injeção: ${err.message}`, 'error');
+      showToast(err.message, 'error', 8000);
+    } finally {
+      btn.disabled = false;
     }
   });
 
   document.getElementById('btn-mkdir').addEventListener('click', async () => {
     const name = prompt('Nome da nova pasta:');
     if (!name) return;
-
-    const fullPath = (state.currentPath.endsWith('/') ? state.currentPath : state.currentPath + '/') + name;
+    if (name.includes('/')) return showToast('O nome não pode conter "/".', 'error');
     try {
-      const res = await fetch(`/api/files/mkdir?path=${encodeURIComponent(fullPath)}`, { method: 'POST' });
-      if (res.ok) {
-        showToast(`Pasta "${name}" criada!`, 'success');
-        loadFiles(state.currentPath);
-      }
+      await api(`/api/files/mkdir?path=${encodeURIComponent(state.currentPath + name)}`, { method: 'POST' });
+      showToast(`Pasta "${name}" criada!`, 'success');
+      loadFiles(state.currentPath);
     } catch (err) {
-      showToast('Erro ao criar pasta.', 'error');
+      showToast('Erro ao criar pasta: ' + err.message, 'error');
     }
   });
 }
@@ -1374,60 +1529,31 @@ async function runRegionConversion() {
   const sourceId = document.getElementById('converter-source-id').value.trim().toUpperCase();
   const targetId = document.getElementById('converter-target-id').value.trim().toUpperCase();
   const version = document.getElementById('converter-version').value.trim();
+  if (fileInput.files.length === 0) return showToast('Selecione o arquivo .json do cheat original.', 'error');
 
-  if (fileInput.files.length === 0) {
-    showToast('Selecione o arquivo .json do cheat original.', 'error');
-    return;
+  const rawJson = await fileInput.files[0].text();
+  showToast(`Convertendo ${sourceId} → ${targetId}...`, 'info');
+  try {
+    const data = await postJson('/api/cheat/convert', { sourceId, targetId, version, json: rawJson });
+    showToast(`Cheat ${data.filename} convertido e enviado para o PS4!`, 'success');
+    closeModal('modal-converter');
+    if (state.currentTab === 'cheats') loadCheats();
+  } catch (err) {
+    showToast(`Falha na conversão: ${err.message}`, 'error', 7000);
   }
-
-  const file = fileInput.files[0];
-  const reader = new FileReader();
-
-  reader.onload = async (e) => {
-    const rawJson = e.target.result;
-    showToast(`Convertendo ${sourceId} para ${targetId}...`);
-
-    try {
-      const res = await fetch('/api/cheat/convert', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          sourceId: sourceId,
-          targetId: targetId,
-          version: version,
-          json: rawJson
-        })
-      });
-
-      const data = await res.json();
-      if (data.success) {
-        showToast(`Cheat ${data.filename} convertido e enviado para o PS4!`, 'success');
-        closeModal('modal-converter');
-        if (state.currentTab === 'cheats') loadCheats();
-      } else {
-        showToast('Falha na conversão do cheat.', 'error');
-      }
-    } catch (err) {
-      showToast(`Erro: ${err.message}`, 'error');
-    }
-  };
-
-  reader.readAsText(file);
 }
 
 // ================= FILE ACTIONS =================
 async function deleteItem(path, isDir) {
-  if (!confirm(`Deseja realmente excluir "${path}"?`)) return;
-
+  if (!confirm(`Excluir "${path}" do PS4?\n\nEsta ação não pode ser desfeita.`)) return;
   try {
-    const res = await fetch(`/api/files/delete?path=${encodeURIComponent(path)}&isDir=${isDir}`, { method: 'POST' });
-    if (res.ok) {
-      showToast('Item excluído com sucesso.', 'success');
-      if (state.currentTab === 'files') loadFiles(state.currentPath);
-      if (state.currentTab === 'pkgs') loadPkgs();
-    }
+    await api(`/api/files/delete?path=${encodeURIComponent(path.replace(/\/$/, ''))}&isDir=${isDir}`, { method: 'POST' });
+    showToast('Item excluído.', 'success');
+    if (state.currentTab === 'files') loadFiles(state.currentPath);
+    if (state.currentTab === 'pkgs') loadPkgs();
+    fetchSummary(true);
   } catch (err) {
-    showToast('Erro ao excluir item.', 'error');
+    showToast(err.message, 'error', 6000);
   }
 }
 
@@ -1440,26 +1566,24 @@ function closeModal(id) {
   document.getElementById(id).classList.remove('active');
 }
 
-function showToast(msg, type = 'info') {
+function showToast(msg, type = 'info', duration = 3500) {
   const container = document.getElementById('toast-container');
   const toast = document.createElement('div');
   toast.className = `toast ${type}`;
   toast.textContent = msg;
-
   container.appendChild(toast);
   setTimeout(() => {
     toast.style.opacity = '0';
     setTimeout(() => toast.remove(), 300);
-  }, 3500);
+  }, duration);
 }
 
 function formatBytes(bytes, decimals = 1) {
   if (!+bytes) return '0 B';
   const k = 1024;
-  const dm = decimals < 0 ? 0 : decimals;
   const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} ${sizes[i]}`;
+  const i = Math.min(sizes.length - 1, Math.floor(Math.log(bytes) / Math.log(k)));
+  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(decimals))} ${sizes[i]}`;
 }
 
 // ================= INTERACTIVE TUTORIAL TOUR =================
@@ -1480,11 +1604,11 @@ const tourSteps = [
     switchTab: 'dashboard',
     pt: {
       title: "2. Status do Console & Rede",
-      desc: "Acompanhe aqui em tempo real a latência (ping), o status do servidor FTP (2121) do GoldHEN e a porta de injeção de Payloads (9090)."
+      desc: "Acompanhe aqui em tempo real a latência (ping) e o servidor FTP do GoldHEN. Use 'Testar portas' para checar BinLoader (9090), ps4debug (744) e o instalador remoto (12800)."
     },
     en: {
       title: "2. Console Status & Network",
-      desc: "Check real-time connectivity, latency in milliseconds, and status for GoldHEN FTP (2121) and BinLoader (9090) ports."
+      desc: "Check real-time connectivity and the GoldHEN FTP server. Use 'Test ports' to check BinLoader (9090), ps4debug (744) and the remote installer (12800)."
     }
   },
   {

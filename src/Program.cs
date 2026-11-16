@@ -3,12 +3,10 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Net;
-using System.Net.NetworkInformation;
-using System.Net.Sockets;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
-using System.Security.Cryptography;
 using System.Web.Script.Serialization;
 
 namespace OrbisWebManager
@@ -22,1693 +20,1002 @@ namespace OrbisWebManager
         public string ps4_fw { get; set; }
         public string active_user { get; set; }
         public string steamgriddb_api_key { get; set; }
+        public string pc_pkg_folder { get; set; }
 
         public static Config Load(string path)
         {
-            var serializer = new JavaScriptSerializer();
+            Config cfg = null;
             if (File.Exists(path))
             {
-                try
-                {
-                    string json = File.ReadAllText(path);
-                    var cfg = serializer.Deserialize<Config>(json);
-                    if (string.IsNullOrEmpty(cfg.ps4_fw)) cfg.ps4_fw = "9.00";
-                    if (cfg.active_user == null) cfg.active_user = "";
-                    if (cfg.steamgriddb_api_key == null) cfg.steamgriddb_api_key = "";
-                    return cfg;
-                }
-                catch { }
+                try { cfg = new JavaScriptSerializer().Deserialize<Config>(File.ReadAllText(path)); }
+                catch { cfg = null; }
             }
-            var def = new Config
-            {
-                ps4_ip = "192.168.18.54",
-                ftp_port = 2121,
-                payload_port = 9090,
-                http_port = 5000,
-                ps4_fw = "9.00",
-                active_user = "",
-                steamgriddb_api_key = ""
-            };
-            def.Save(path);
-            return def;
+            if (cfg == null) cfg = new Config();
+            if (string.IsNullOrEmpty(cfg.ps4_ip)) cfg.ps4_ip = "192.168.1.100";
+            if (cfg.ftp_port <= 0) cfg.ftp_port = 2121;
+            if (cfg.payload_port <= 0) cfg.payload_port = 9090;
+            if (cfg.http_port <= 0) cfg.http_port = 5000;
+            if (string.IsNullOrEmpty(cfg.ps4_fw)) cfg.ps4_fw = "9.00";
+            if (cfg.active_user == null) cfg.active_user = "";
+            if (cfg.steamgriddb_api_key == null) cfg.steamgriddb_api_key = "";
+            if (cfg.pc_pkg_folder == null) cfg.pc_pkg_folder = "";
+            cfg.Save(path);
+            return cfg;
         }
 
         public void Save(string path)
         {
-            var serializer = new JavaScriptSerializer();
-            string json = serializer.Serialize(this);
-            File.WriteAllText(path, json);
+            File.WriteAllText(path, new JavaScriptSerializer().Serialize(this));
         }
-    }
-
-    public class PS4User
-    {
-        public string id { get; set; }
-        public string name { get; set; }
-        public string date { get; set; }
-        public DateTime lastModified { get; set; }
-    }
-
-    public class FtpItem
-    {
-        public string name { get; set; }
-        public bool isDir { get; set; }
-        public long size { get; set; }
-        public string date { get; set; }
-        public string permissions { get; set; }
-    }
-
-    public class GameItem
-    {
-        public string id { get; set; }
-        public string name { get; set; }
-        public string contentId { get; set; }
-        public int timePlayedMinutes { get; set; }
-        public int gameStarts { get; set; }
-        public bool hasCheats { get; set; }
-        public string iconUrl { get; set; }
-    }
-
-    public class CaptureItem
-    {
-        public string titleId { get; set; }
-        public string fileName { get; set; }
-        public string fullPath { get; set; }
-        public string imageUrl { get; set; }
     }
 
     class Program
     {
+        public const string AppVersion = "2.0";
         public static Config Settings;
-        public static string AppDir;
-        public static string CacheDir;
-        public static string IconsDir;
-        public static string CapturesDir;
-        public static string WwwDir;
-        public static string ConfigPath;
-        public static Dictionary<string, string> GameTitleCache = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-        public static Dictionary<string, string> UserNameCache = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        public static string AppDir, CacheDir, CapturesDir, WwwDir, ConfigPath;
+        public static bool LanAccess;
 
         public static DateTime ParseFtpDate(string dateStr)
         {
             if (string.IsNullOrEmpty(dateStr)) return DateTime.MinValue;
-            string[] parts = dateStr.Split(new char[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
-            if (parts.Length >= 3)
+            string[] parts = dateStr.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length < 3) return DateTime.MinValue;
+            int year = DateTime.Now.Year, day = 1, month = 1, hour = 0, minute = 0;
+            int.TryParse(parts[1], out day);
+            if (parts[2].Contains(":"))
             {
-                int year = DateTime.Now.Year;
-                int day = 1;
-                int.TryParse(parts[1], out day);
-                if (!parts[2].Contains(":"))
-                {
-                    int.TryParse(parts[2], out year);
-                }
-                int month = 1;
-                string[] months = { "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec" };
-                for (int i = 0; i < months.Length; i++)
-                {
-                    if (parts[0].StartsWith(months[i], StringComparison.OrdinalIgnoreCase))
-                    {
-                        month = i + 1;
-                        break;
-                    }
-                }
-                try { return new DateTime(year, month, day); } catch { }
+                var hm = parts[2].Split(':');
+                int.TryParse(hm[0], out hour);
+                int.TryParse(hm[1], out minute);
             }
-            return DateTime.MinValue;
+            else int.TryParse(parts[2], out year);
+            string[] months = { "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec" };
+            for (int i = 0; i < months.Length; i++)
+                if (parts[0].StartsWith(months[i], StringComparison.OrdinalIgnoreCase)) { month = i + 1; break; }
+            try { return new DateTime(year, month, day, hour, minute, 0); } catch { return DateTime.MinValue; }
         }
-
-        private static readonly byte[] TmdbMasterKey = new byte[] {
-            0xF5, 0xDE, 0x66, 0xD2, 0x68, 0x0E, 0x25, 0x5B, 0x2D, 0xF7, 0x9E, 0x74, 0xF8, 0x90, 0xEB, 0xF3,
-            0x49, 0x26, 0x2F, 0x61, 0x8B, 0xCA, 0xE2, 0xA9, 0xAC, 0xCD, 0xEE, 0x51, 0x56, 0xCE, 0x8D, 0xF2,
-            0xCD, 0xF2, 0xD4, 0x8C, 0x71, 0x17, 0x3C, 0xDC, 0x25, 0x94, 0x46, 0x5B, 0x87, 0x40, 0x5D, 0x19,
-            0x7C, 0xF1, 0xAE, 0xD3, 0xB7, 0xE9, 0x67, 0x1E, 0xEB, 0x56, 0xCA, 0x67, 0x53, 0xC2, 0xE6, 0xB0
-        };
-
-        public static string GetSonyTmdbUrl(string titleId)
-        {
-            try
-            {
-                string target = titleId.ToUpper().Trim();
-                if (!target.EndsWith("_00")) target += "_00";
-                byte[] targetBytes = Encoding.UTF8.GetBytes(target);
-                using (var hmac = new HMACSHA1(TmdbMasterKey))
-                {
-                    byte[] hash = hmac.ComputeHash(targetBytes);
-                    StringBuilder sb = new StringBuilder();
-                    foreach (byte b in hash) sb.Append(b.ToString("X2"));
-                    string sig = sb.ToString();
-                    return "https://tmdb.np.dl.playstation.net/tmdb2/" + target + "_" + sig + "/" + target + ".json";
-                }
-            }
-            catch
-            {
-                return null;
-            }
-        }
-
-        public static string FetchSonyIconUrl(string titleId)
-        {
-            try
-            {
-                string url = GetSonyTmdbUrl(titleId);
-                if (string.IsNullOrEmpty(url)) return null;
-
-                var req = (HttpWebRequest)WebRequest.Create(url);
-                req.UserAgent = "Mozilla/5.0";
-                req.Timeout = 5000;
-                using (var res = (HttpWebResponse)req.GetResponse())
-                using (var reader = new StreamReader(res.GetResponseStream(), Encoding.UTF8))
-                {
-                    string json = reader.ReadToEnd();
-                    var mIcon = Regex.Match(json, @"""icon""\s*:\s*""([^""]+)""");
-                    if (mIcon.Success) return mIcon.Groups[1].Value;
-                }
-            }
-            catch { }
-            return null;
-        }
-
-        public static bool DownloadSonyIcon(string titleId, string localPath)
-        {
-            try
-            {
-                string iconUrl = FetchSonyIconUrl(titleId);
-                if (string.IsNullOrEmpty(iconUrl)) return false;
-
-                using (var wc = new WebClient())
-                {
-                    wc.Headers.Add("User-Agent", "Mozilla/5.0");
-                    wc.DownloadFile(iconUrl, localPath);
-                    return File.Exists(localPath);
-                }
-            }
-            catch { }
-            return false;
-        }
-
-        // Synchronization lock for PS4 embedded FTP server to prevent concurrent connection drops
-        private static readonly object FtpLock = new object();
 
         static void Main(string[] args)
         {
             try
             {
                 ServicePointManager.SecurityProtocol = (SecurityProtocolType)3072 | (SecurityProtocolType)768 | SecurityProtocolType.Tls;
-                ServicePointManager.ServerCertificateValidationCallback = (sender, cert, chain, sslPolicyErrors) => true;
+                ServicePointManager.DefaultConnectionLimit = 16;
             }
             catch { }
+            ThreadPool.SetMinThreads(32, 32);
 
-            Console.OutputEncoding = Encoding.UTF8;
+            System.Console.OutputEncoding = Encoding.UTF8;
             AppDir = AppDomain.CurrentDomain.BaseDirectory;
             CacheDir = Path.Combine(AppDir, "cache");
-            IconsDir = Path.Combine(CacheDir, "icons");
             CapturesDir = Path.Combine(CacheDir, "captures");
             WwwDir = Path.Combine(AppDir, "wwwroot");
             ConfigPath = Path.Combine(AppDir, "config.json");
-
-            if (!Directory.Exists(CacheDir)) Directory.CreateDirectory(CacheDir);
-            if (!Directory.Exists(IconsDir)) Directory.CreateDirectory(IconsDir);
-            if (!Directory.Exists(CapturesDir)) Directory.CreateDirectory(CapturesDir);
+            foreach (var d in new[] { CacheDir, CapturesDir, Path.Combine(CapturesDir, "thumbs"), Covers.IconsDir, Covers.OriginalsDir })
+                Directory.CreateDirectory(d);
 
             Settings = Config.Load(ConfigPath);
 
-            Console.ForegroundColor = ConsoleColor.Cyan;
-            Console.WriteLine(@"
-   ___       _     _      __      __   _       __  __                                 
-  / _ \ _ _ | |__ (_)___  \ \    / /__| |__   |  \/  |__ _ _ _  __ _ __ _ ___ _ _     
- | (_) | '_|| '_ \| (_-<   \ \/\/ / -_) '_ \  | |\/| / _` | ' \/ _` / _` / -_) '_|    
-  \___/|_|  |_.__/|_/__/    \_/\_/\___|_.__/  |_|  |_\__,_|_||_\__,_\__, \___|_|      
-                                                                    |___/             
-               PlayStation 4 Web Management Suite (GoldHEN Compatible)
-            ");
-            Console.ResetColor();
+            System.Console.ForegroundColor = ConsoleColor.Cyan;
+            System.Console.WriteLine();
+            System.Console.WriteLine("   ORBIS WEB MANAGER v" + AppVersion + "  -  PlayStation 4 Web Suite (GoldHEN)");
+            System.Console.WriteLine();
+            System.Console.ResetColor();
 
-            LoadCachedGameTitles();
+            Library.Load();
+            // Warm up caches in the background so the first page load is fast
+            ThreadPool.QueueUserWorkItem(_ => { try { Library.Refresh(); } catch { } });
+            ThreadPool.QueueUserWorkItem(_ => { try { Summary.Get(false); } catch { } });
 
             StartHttpServer();
         }
 
-        static void LoadCachedGameTitles()
-        {
-            string dbCache = Path.Combine(CacheDir, "app.db");
-            if (File.Exists(dbCache))
-            {
-                ParseAppDb(dbCache);
-            }
-        }
-
-        public static void ParseAppDb(string dbPath)
-        {
-            try
-            {
-                byte[] bytes = File.ReadAllBytes(dbPath);
-                string str = Encoding.UTF8.GetString(bytes);
-                var matches = Regex.Matches(str, @"(?:[A-Z]{2}\d{4}-[A-Z0-9]{9}_\d{2}-[A-Z0-9]{16})([^\x00\x01\x02\x03\x04\x05\x06\x07\x08]+)/user/appmeta/([A-Za-z0-9_]{9})");
-                foreach (Match m in matches)
-                {
-                    string id = m.Groups[2].Value.ToUpper();
-                    string name = m.Groups[1].Value.Trim();
-                    if (!GameTitleCache.ContainsKey(id) && name.Length > 1)
-                    {
-                        GameTitleCache[id] = name;
-                    }
-                }
-            }
-            catch { }
-        }
-
         static void StartHttpServer()
         {
+            int port = Settings.http_port;
             HttpListener listener = new HttpListener();
-            try
-            {
-                listener.Prefixes.Add("http://localhost:" + Settings.http_port + "/");
-                listener.Prefixes.Add("http://127.0.0.1:" + Settings.http_port + "/");
-            }
-            catch { }
-
-            List<string> localIps = new List<string>();
-            try
-            {
-                foreach (var ip in Dns.GetHostAddresses(Dns.GetHostName()))
-                {
-                    if (ip.AddressFamily == AddressFamily.InterNetwork && !IPAddress.IsLoopback(ip))
-                    {
-                        string ipStr = ip.ToString();
-                        localIps.Add(ipStr);
-                        try
-                        {
-                            listener.Prefixes.Add("http://" + ipStr + ":" + Settings.http_port + "/");
-                        }
-                        catch { }
-                    }
-                }
-            }
-            catch { }
-
+            listener.Prefixes.Add("http://+:" + port + "/");
             try
             {
                 listener.Start();
+                LanAccess = true;
             }
-            catch (Exception ex)
+            catch (HttpListenerException)
             {
-                Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine("Erro ao iniciar HttpListener: " + ex.Message);
-                Console.ResetColor();
+                // Listening on all interfaces requires a URL ACL (one-time admin step).
                 listener = new HttpListener();
-                listener.Prefixes.Add("http://localhost:" + Settings.http_port + "/");
-                listener.Start();
+                listener.Prefixes.Add("http://localhost:" + port + "/");
+                listener.Prefixes.Add("http://127.0.0.1:" + port + "/");
+                try
+                {
+                    listener.Start();
+                }
+                catch (Exception ex)
+                {
+                    System.Console.ForegroundColor = ConsoleColor.Red;
+                    System.Console.WriteLine("[ERRO] Não foi possível abrir a porta " + port + ": " + ex.Message);
+                    System.Console.WriteLine("       Outra cópia do Orbis Web Manager já está aberta?");
+                    System.Console.ResetColor();
+                    return;
+                }
+                LanAccess = false;
             }
 
-            Console.ForegroundColor = ConsoleColor.Green;
-            Console.WriteLine("[+] Servidor Web Iniciado com Sucesso!");
-            Console.WriteLine("    -> Acesso no PC:     http://localhost:" + Settings.http_port);
-            foreach (var ip in localIps)
+            System.Console.ForegroundColor = ConsoleColor.Green;
+            System.Console.WriteLine("[+] Servidor iniciado");
+            System.Console.WriteLine("    -> No PC:      http://localhost:" + port);
+            if (LanAccess)
             {
-                Console.WriteLine("    -> Acesso no Celular: http://" + ip + ":" + Settings.http_port);
+                foreach (var ip in Ps4Services.LocalIps()) System.Console.WriteLine("    -> No celular: http://" + ip + ":" + port);
             }
-            Console.WriteLine("    -> Conectado ao PS4:  " + Settings.ps4_ip + ":" + Settings.ftp_port);
-            Console.ResetColor();
-            Console.WriteLine();
-            Console.WriteLine("Pressione Ctrl+C para encerrar o servidor.");
-
-            ThreadPool.QueueUserWorkItem(state =>
+            System.Console.WriteLine("    -> PS4:        " + Settings.ps4_ip + " (FTP " + Settings.ftp_port + ")");
+            System.Console.ResetColor();
+            if (!LanAccess)
             {
-                Thread.Sleep(1000);
-                try { Process.Start("http://localhost:" + Settings.http_port); } catch { }
-            });
+                System.Console.ForegroundColor = ConsoleColor.Yellow;
+                System.Console.WriteLine();
+                System.Console.WriteLine("[!] Acesso pela rede (celular / instalar PKG do PC) está DESATIVADO.");
+                System.Console.WriteLine("    Para liberar, execute UMA vez o arquivo 'liberar-rede.bat' (pede permissão de administrador).");
+                System.Console.ResetColor();
+            }
+            System.Console.WriteLine();
+            System.Console.WriteLine("Pressione Ctrl+C para encerrar.");
 
-            while (true)
+            if (Array.IndexOf(Environment.GetCommandLineArgs(), "--no-browser") < 0)
+            {
+                ThreadPool.QueueUserWorkItem(_ =>
+                {
+                    Thread.Sleep(800);
+                    try { Process.Start("http://localhost:" + port); } catch { }
+                });
+            }
+
+            while (listener.IsListening)
             {
                 try
                 {
-                    HttpListenerContext ctx = listener.GetContext();
+                    var ctx = listener.GetContext();
                     ThreadPool.QueueUserWorkItem(ProcessRequest, ctx);
                 }
-                catch
-                {
-                    break;
-                }
+                catch (HttpListenerException) { break; }
+                catch { }
             }
         }
 
         static void ProcessRequest(object state)
         {
-            HttpListenerContext ctx = (HttpListenerContext)state;
-            HttpListenerRequest req = ctx.Request;
-            HttpListenerResponse res = ctx.Response;
-
-            res.Headers.Add("Access-Control-Allow-Origin", "*");
-            res.Headers.Add("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS");
-            res.Headers.Add("Access-Control-Allow-Headers", "Content-Type");
-
-            if (req.HttpMethod == "OPTIONS")
-            {
-                res.StatusCode = 200;
-                res.Close();
-                return;
-            }
-
-            string path = req.Url.AbsolutePath;
-
+            var ctx = (HttpListenerContext)state;
+            string path = ctx.Request.Url.AbsolutePath;
             try
             {
-                if (path.StartsWith("/api/"))
-                {
-                    HandleApi(ctx);
-                }
-                else
-                {
-                    ServeStaticFile(ctx, path);
-                }
+                if (path.StartsWith("/api/")) Api.Handle(ctx);
+                else if (path.StartsWith("/pcpkg/")) Api.ServePcPkg(ctx);
+                else ServeStatic(ctx, path);
             }
             catch (Exception ex)
             {
                 try
                 {
-                    res.StatusCode = 500;
-                    byte[] err = Encoding.UTF8.GetBytes(new JavaScriptSerializer().Serialize(new { error = ex.Message }));
-                    res.ContentType = "application/json";
-                    res.OutputStream.Write(err, 0, err.Length);
-                    res.Close();
+                    Http.Error(ctx.Response, 500, ex is FtpException || ex is IOException
+                        ? "Falha na comunicação com o PS4: " + ex.Message
+                        : ex.Message);
                 }
                 catch { }
             }
         }
 
-        static void ServeStaticFile(HttpListenerContext ctx, string path)
+        static void ServeStatic(HttpListenerContext ctx, string path)
         {
-            if (path == "/" || string.IsNullOrEmpty(path)) path = "/index.html";
-            string localPath = Path.Combine(WwwDir, path.TrimStart('/').Replace('/', Path.DirectorySeparatorChar));
+            if (path == "/" || path.Length == 0) path = "/index.html";
+            string root = Path.GetFullPath(WwwDir);
+            string local;
+            try { local = Path.GetFullPath(Path.Combine(root, Uri.UnescapeDataString(path).TrimStart('/').Replace('/', Path.DirectorySeparatorChar))); }
+            catch { local = ""; }
+            // Prevent path traversal outside wwwroot
+            if (!local.StartsWith(root, StringComparison.OrdinalIgnoreCase) || !File.Exists(local))
+                local = Path.Combine(root, "index.html");
 
-            if (!File.Exists(localPath))
+            string ext = Path.GetExtension(local).ToLowerInvariant();
+            string type = "application/octet-stream";
+            switch (ext)
             {
-                localPath = Path.Combine(WwwDir, "index.html");
+                case ".html": type = "text/html; charset=utf-8"; break;
+                case ".css": type = "text/css; charset=utf-8"; break;
+                case ".js": type = "application/javascript; charset=utf-8"; break;
+                case ".json": type = "application/json; charset=utf-8"; break;
+                case ".png": type = "image/png"; break;
+                case ".jpg": case ".jpeg": type = "image/jpeg"; break;
+                case ".svg": type = "image/svg+xml"; break;
+                case ".ico": type = "image/x-icon"; break;
             }
+            ctx.Response.Headers["Cache-Control"] = "no-cache";
+            Http.Bytes(ctx.Response, File.ReadAllBytes(local), type);
+        }
+    }
 
-            if (File.Exists(localPath))
-            {
-                string ext = Path.GetExtension(localPath).ToLower();
-                string contentType = "application/octet-stream";
-                switch (ext)
-                {
-                    case ".html": contentType = "text/html; charset=utf-8"; break;
-                    case ".css": contentType = "text/css; charset=utf-8"; break;
-                    case ".js": contentType = "application/javascript; charset=utf-8"; break;
-                    case ".json": contentType = "application/json; charset=utf-8"; break;
-                    case ".png": contentType = "image/png"; break;
-                    case ".jpg":
-                    case ".jpeg": contentType = "image/jpeg"; break;
-                    case ".svg": contentType = "image/svg+xml"; break;
-                    case ".ico": contentType = "image/x-icon"; break;
-                }
-
-                ctx.Response.ContentType = contentType;
-                byte[] content = File.ReadAllBytes(localPath);
-                ctx.Response.ContentLength64 = content.Length;
-                ctx.Response.OutputStream.Write(content, 0, content.Length);
-                ctx.Response.Close();
-            }
-            else
-            {
-                ctx.Response.StatusCode = 404;
-                ctx.Response.Close();
-            }
+    static class Http
+    {
+        public static void Json(HttpListenerResponse res, object data)
+        {
+            var ser = new JavaScriptSerializer { MaxJsonLength = int.MaxValue };
+            Bytes(res, Encoding.UTF8.GetBytes(ser.Serialize(data)), "application/json; charset=utf-8");
         }
 
-        static void SendJson(HttpListenerResponse res, object data)
+        public static void Error(HttpListenerResponse res, int code, string msg)
         {
-            var serializer = new JavaScriptSerializer();
-            string json = serializer.Serialize(data);
-            byte[] bytes = Encoding.UTF8.GetBytes(json);
-            res.ContentType = "application/json; charset=utf-8";
-            res.ContentLength64 = bytes.Length;
-            res.OutputStream.Write(bytes, 0, bytes.Length);
+            res.StatusCode = code;
+            Json(res, new { success = false, error = msg });
+        }
+
+        public static void Bytes(HttpListenerResponse res, byte[] b, string type)
+        {
+            res.ContentType = type;
+            res.ContentLength64 = b.Length;
+            res.OutputStream.Write(b, 0, b.Length);
             res.Close();
         }
 
-        static void HandleApi(HttpListenerContext ctx)
+        public static Dictionary<string, object> ReadJson(HttpListenerRequest req)
         {
-            HttpListenerRequest req = ctx.Request;
-            HttpListenerResponse res = ctx.Response;
-            string path = req.Url.AbsolutePath;
-            var query = req.QueryString;
-
-            // 1. STATUS
-            if (path == "/api/status")
+            using (var r = new StreamReader(req.InputStream, Encoding.UTF8))
             {
-                long pingMs = -1;
-                bool pingOk = false;
-                try
-                {
-                    using (Ping p = new Ping())
-                    {
-                        var reply = p.Send(Settings.ps4_ip, 1000);
-                        if (reply.Status == IPStatus.Success)
-                        {
-                            pingOk = true;
-                            pingMs = reply.RoundtripTime;
-                        }
-                    }
-                }
-                catch { }
-
-                bool ftpOk = false;
-                string banner = "";
-                try
-                {
-                    using (var c = new TcpClient())
-                    {
-                        var t = c.ConnectAsync(Settings.ps4_ip, Settings.ftp_port).Wait(800);
-                        if (t && c.Connected)
-                        {
-                            ftpOk = true;
-                            c.ReceiveTimeout = 800;
-                            var s = c.GetStream();
-                            byte[] b = new byte[256];
-                            int read = s.Read(b, 0, b.Length);
-                            banner = Encoding.ASCII.GetString(b, 0, read).Trim();
-                        }
-                    }
-                }
-                catch { }
-
-                bool payloadPortOk = false;
-                try
-                {
-                    using (var c = new TcpClient())
-                    {
-                        payloadPortOk = c.ConnectAsync(Settings.ps4_ip, Settings.payload_port).Wait(400);
-                    }
-                }
-                catch { }
-
-                string username = "PlayStation 4";
-                string userId = "";
-                List<object> detectedUsers = new List<object>();
-                try
-                {
-                    var userFolders = ListFtpDirectory("/user/home/");
-                    var userList = new List<PS4User>();
-                    foreach (var uf in userFolders)
-                    {
-                        if (uf.isDir && uf.name.Length >= 4 && uf.name != "." && uf.name != "..")
-                        {
-                            string uName = "";
-                            if (UserNameCache.ContainsKey(uf.name))
-                            {
-                                uName = UserNameCache[uf.name];
-                            }
-                            else
-                            {
-                                string userDat = DownloadFtpText("/user/home/" + uf.name + "/username.dat");
-                                if (!string.IsNullOrEmpty(userDat))
-                                {
-                                    uName = userDat.Trim('\0', ' ', '\r', '\n');
-                                    UserNameCache[uf.name] = uName;
-                                }
-                            }
-
-                            if (string.IsNullOrEmpty(uName)) uName = uf.name;
-
-                            userList.Add(new PS4User
-                            {
-                                id = uf.name,
-                                name = uName,
-                                date = uf.date,
-                                lastModified = ParseFtpDate(uf.date)
-                            });
-                        }
-                    }
-
-                    if (userList.Count > 0)
-                    {
-                        userList.Sort((a, b) => b.lastModified.CompareTo(a.lastModified));
-
-                        PS4User chosen = null;
-                        if (!string.IsNullOrEmpty(Settings.active_user))
-                        {
-                            chosen = userList.Find(u => u.name.Equals(Settings.active_user, StringComparison.OrdinalIgnoreCase) || u.id.Equals(Settings.active_user, StringComparison.OrdinalIgnoreCase));
-                        }
-                        if (chosen == null)
-                        {
-                            chosen = userList[0];
-                        }
-
-                        username = chosen.name;
-                        userId = chosen.id;
-
-                        foreach (var u in userList)
-                        {
-                            detectedUsers.Add(new
-                            {
-                                id = u.id,
-                                name = u.name,
-                                date = u.date,
-                                isCurrent = (u.id == chosen.id)
-                            });
-                        }
-                    }
-                }
-                catch { }
-
-                string goldhenVer = "GoldHEN v2.2";
-                if (!string.IsNullOrEmpty(banner))
-                {
-                    var mHen = Regex.Match(banner, @"(GoldHEN[^\r\n]*)", RegexOptions.IgnoreCase);
-                    if (mHen.Success)
-                    {
-                        string rawVer = mHen.Groups[1].Value.Replace("FTP server", "").Replace("FTP Server", "").Trim();
-                        goldhenVer = Regex.Replace(rawVer, @"\s+", " ");
-                    }
-                }
-
-                int cheatCount = 0;
-                try
-                {
-                    var cheats = ListFtpDirectory("/data/GoldHEN/cheats/json/");
-                    cheatCount = cheats.Count;
-                }
-                catch { }
-
-                int pkgCount = 0;
-                long totalPkgSize = 0;
-                try
-                {
-                    var pkgs = ListFtpDirectory("/data/pkg/");
-                    foreach (var p in pkgs)
-                    {
-                        if (!p.isDir && p.name.EndsWith(".pkg", StringComparison.OrdinalIgnoreCase))
-                        {
-                            pkgCount++;
-                            totalPkgSize += p.size;
-                        }
-                    }
-                }
-                catch { }
-
-                SendJson(res, new
-                {
-                    online = pingOk || ftpOk,
-                    ping = pingMs,
-                    ip = Settings.ps4_ip,
-                    ftpPort = Settings.ftp_port,
-                    ftpOk = ftpOk,
-                    payloadPort = Settings.payload_port,
-                    payloadPortOk = payloadPortOk,
-                    banner = banner,
-                    fw = string.IsNullOrEmpty(Settings.ps4_fw) ? "9.00" : Settings.ps4_fw,
-                    goldhenVer = goldhenVer,
-                    username = username,
-                    userId = userId,
-                    users = detectedUsers,
-                    cheatCount = cheatCount,
-                    pkgCount = pkgCount,
-                    totalPkgSize = totalPkgSize
-                });
-                return;
+                string body = r.ReadToEnd();
+                if (string.IsNullOrWhiteSpace(body)) return new Dictionary<string, object>();
+                var d = new JavaScriptSerializer { MaxJsonLength = int.MaxValue }.Deserialize<Dictionary<string, object>>(body);
+                return d ?? new Dictionary<string, object>();
             }
+        }
 
-            // 2. GAMES
-            if (path == "/api/games")
+        public static string Str(Dictionary<string, object> d, string key)
+        {
+            object v;
+            return d.TryGetValue(key, out v) && v != null ? v.ToString() : "";
+        }
+
+        public static byte[] ReadBody(HttpListenerRequest req, long max)
+        {
+            using (var ms = new MemoryStream())
             {
-                string dbCache = Path.Combine(CacheDir, "app.db");
-                if (!File.Exists(dbCache))
+                byte[] buf = new byte[65536];
+                int n;
+                while ((n = req.InputStream.Read(buf, 0, buf.Length)) > 0)
                 {
-                    try
-                    {
-                        DownloadFtpFile("/system_data/priv/mms/app.db", dbCache);
-                        ParseAppDb(dbCache);
-                    }
-                    catch { }
+                    ms.Write(buf, 0, n);
+                    if (ms.Length > max) throw new Exception("Arquivo muito grande.");
                 }
-
-                var appFolders = ListFtpDirectory("/user/appmeta/");
-                List<GameItem> games = new List<GameItem>();
-
-                HashSet<string> cheatIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-                try
-                {
-                    var cheatFiles = ListFtpDirectory("/data/GoldHEN/cheats/json/");
-                    foreach (var f in cheatFiles)
-                    {
-                        var m = Regex.Match(f.name, @"^([A-Z0-9_]{9})_");
-                        if (m.Success) cheatIds.Add(m.Groups[1].Value);
-                    }
-                }
-                catch { }
-
-                // Non-game system folders to ignore
-                HashSet<string> ignoreFolders = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-                {
-                    "addcont", "push_resource", "NPXS39041", "NPXS20001"
-                };
-
-                foreach (var folder in appFolders)
-                {
-                    if (folder.isDir && !ignoreFolders.Contains(folder.name))
-                    {
-                        string id = folder.name.ToUpper();
-                        string name = id;
-                        if (GameTitleCache.ContainsKey(id))
-                        {
-                            name = GameTitleCache[id];
-                        }
-
-                        int timePlayed = 0;
-                        int gameStarts = 0;
-                        try
-                        {
-                            string statIni = DownloadFtpText("/data/GoldHEN/stats/" + id + ".ini");
-                            if (!string.IsNullOrEmpty(statIni))
-                            {
-                                var mTime = Regex.Match(statIni, @"Time_Played\s*=\s*(\d+)");
-                                if (mTime.Success) timePlayed = int.Parse(mTime.Groups[1].Value);
-
-                                var mStarts = Regex.Match(statIni, @"Game_Starts\s*=\s*(\d+)");
-                                if (mStarts.Success) gameStarts = int.Parse(mStarts.Groups[1].Value);
-                            }
-                        }
-                        catch { }
-
-                        games.Add(new GameItem
-                        {
-                            id = id,
-                            name = name,
-                            timePlayedMinutes = timePlayed,
-                            gameStarts = gameStarts,
-                            hasCheats = cheatIds.Contains(id),
-                            iconUrl = "/api/game/icon?id=" + id
-                        });
-                    }
-                }
-
-                games.Sort((a, b) =>
-                {
-                    int c = b.timePlayedMinutes.CompareTo(a.timePlayedMinutes);
-                    if (c != 0) return c;
-                    return a.name.CompareTo(b.name);
-                });
-
-                SendJson(res, games);
-                return;
+                return ms.ToArray();
             }
+        }
 
-            // 3. GAME ICON
-            if (path == "/api/game/icon")
+        public static string ContentDisposition(string fileName)
+        {
+            string ascii = Regex.Replace(fileName, @"[^\x20-\x7E]|""", "_");
+            return "attachment; filename=\"" + ascii + "\"; filename*=UTF-8''" + Uri.EscapeDataString(fileName);
+        }
+    }
+
+    static class Api
+    {
+        static readonly Regex TitleIdRx = new Regex(@"^[A-Z]{4}\d{5}$");
+        static readonly Dictionary<string, KeyValuePair<DateTime, object>> captureCache = new Dictionary<string, KeyValuePair<DateTime, object>>();
+        static object statusCache;
+        static DateTime statusAt = DateTime.MinValue;
+        static readonly object statusLock = new object();
+
+        public static void Handle(HttpListenerContext ctx)
+        {
+            var req = ctx.Request;
+            var res = ctx.Response;
+            string path = req.Url.AbsolutePath.TrimEnd('/');
+            var q = req.QueryString;
+            bool post = req.HttpMethod == "POST";
+
+            // Mutating requests must come from our own page (blocks drive-by CSRF from other sites)
+            if (post)
             {
-                string id = query["id"];
-                if (string.IsNullOrEmpty(id)) { res.StatusCode = 400; res.Close(); return; }
-
-                string iconCache = Path.Combine(IconsDir, id + ".png");
-                if (!File.Exists(iconCache))
+                string origin = req.Headers["Origin"];
+                if (!string.IsNullOrEmpty(origin))
                 {
-                    try
+                    Uri o;
+                    if (!Uri.TryCreate(origin, UriKind.Absolute, out o) || o.Authority != req.Url.Authority)
                     {
-                        DownloadFtpFile("/user/appmeta/" + id + "/icon0.png", iconCache);
-                    }
-                    catch
-                    {
-                        // Check if tmp icon exists in /data/
-                        try
-                        {
-                            var tmpFiles = ListFtpDirectory("/data/");
-                            foreach (var f in tmpFiles)
-                            {
-                                if (f.name.Contains(id) && f.name.EndsWith(".png", StringComparison.OrdinalIgnoreCase))
-                                {
-                                    DownloadFtpFile("/data/" + f.name, iconCache);
-                                    break;
-                                }
-                            }
-                        }
-                        catch { }
-                    }
-
-                    // Fallback to official Sony PlayStation TMDB CDN if not found on PS4
-                    if (!File.Exists(iconCache) && id.StartsWith("CUSA", StringComparison.OrdinalIgnoreCase))
-                    {
-                        DownloadSonyIcon(id, iconCache);
-                    }
-                }
-
-                if (File.Exists(iconCache))
-                {
-                    res.ContentType = "image/png";
-                    byte[] b = File.ReadAllBytes(iconCache);
-                    res.ContentLength64 = b.Length;
-                    res.OutputStream.Write(b, 0, b.Length);
-                    res.Close();
-                }
-                else
-                {
-                    res.StatusCode = 404;
-                    res.Close();
-                }
-                return;
-            }
-
-            // 4. UPLOAD CUSTOM COVER
-            if (path == "/api/game/icon/upload" && req.HttpMethod == "POST")
-            {
-                string id = query["id"];
-                if (string.IsNullOrEmpty(id))
-                {
-                    res.StatusCode = 400;
-                    SendJson(res, new { error = "O parâmetro 'id' é obrigatório." });
-                    return;
-                }
-
-                byte[] imgBytes;
-                using (var ms = new MemoryStream())
-                {
-                    req.InputStream.CopyTo(ms);
-                    imgBytes = ms.ToArray();
-                }
-
-                if (imgBytes.Length > 0)
-                {
-                    // Update local cache
-                    string iconCache = Path.Combine(IconsDir, id + ".png");
-                    File.WriteAllBytes(iconCache, imgBytes);
-
-                    // Upload directly to PS4
-                    string remotePath = "/user/appmeta/" + id + "/icon0.png";
-                    using (var ms = new MemoryStream(imgBytes))
-                    {
-                        StreamFtpUpload(remotePath, ms, imgBytes.Length);
-                    }
-
-                    SendJson(res, new { success = true, iconUrl = "/api/game/icon?id=" + id + "&t=" + DateTime.Now.Ticks });
-                }
-                else
-                {
-                    res.StatusCode = 400;
-                    SendJson(res, new { error = "Arquivo vazio." });
-                }
-                return;
-            }
-
-            // 4.1 SEARCH COVERS ONLINE (SONY TMDB + STEAMGRIDDB)
-            if (path == "/api/game/covers/search")
-            {
-                string id = query["id"] ?? "";
-                string title = query["title"] ?? "";
-
-                // 1. Sony PlayStation TMDB Official Artwork
-                object sonyCover = null;
-                if (!string.IsNullOrEmpty(id) && id.StartsWith("CUSA", StringComparison.OrdinalIgnoreCase))
-                {
-                    try
-                    {
-                        string sUrl = GetSonyTmdbUrl(id);
-                        if (!string.IsNullOrEmpty(sUrl))
-                        {
-                            var sReq = (HttpWebRequest)WebRequest.Create(sUrl);
-                            sReq.UserAgent = "Mozilla/5.0";
-                            sReq.Timeout = 5000;
-                            using (var sRes = (HttpWebResponse)sReq.GetResponse())
-                            using (var r = new StreamReader(sRes.GetResponseStream(), Encoding.UTF8))
-                            {
-                                string sJson = r.ReadToEnd();
-                                string iconUrl = "";
-                                string bgUrl = "";
-                                var mIcon = Regex.Match(sJson, @"""icon""\s*:\s*""([^""]+)""");
-                                if (mIcon.Success) iconUrl = mIcon.Groups[1].Value;
-                                var mBg = Regex.Match(sJson, @"""backgroundImage""\s*:\s*""([^""]+)""");
-                                if (mBg.Success) bgUrl = mBg.Groups[1].Value;
-
-                                if (!string.IsNullOrEmpty(iconUrl))
-                                {
-                                    sonyCover = new
-                                    {
-                                        available = true,
-                                        icon = iconUrl,
-                                        background = bgUrl,
-                                        source = "Sony PlayStation Store (TMDB Oficial 512x512)"
-                                    };
-                                }
-                            }
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        Console.WriteLine("Sony TMDB Exception for " + id + ": " + ex.Message);
-                    }
-                }
-
-                // 2. SteamGridDB Community Grids & Artwork
-                bool hasSgdbKey = !string.IsNullOrEmpty(Settings.steamgriddb_api_key);
-                List<object> sgdbGrids = new List<object>();
-
-                if (hasSgdbKey && (!string.IsNullOrEmpty(title) || !string.IsNullOrEmpty(id)))
-                {
-                    try
-                    {
-                        string searchTerm = !string.IsNullOrEmpty(title) ? title : id;
-                        searchTerm = Regex.Replace(searchTerm, @"[®™©]", "").Trim();
-
-                        string searchUrl = "https://www.steamgriddb.com/api/v2/search/autocomplete/" + Uri.EscapeDataString(searchTerm);
-                        var sReq = (HttpWebRequest)WebRequest.Create(searchUrl);
-                        sReq.Headers.Add("Authorization", "Bearer " + Settings.steamgriddb_api_key.Trim());
-                        sReq.UserAgent = "OrbisWebManager/1.0";
-                        sReq.Timeout = 6000;
-
-                        int sgdbGameId = -1;
-                        using (var sRes = (HttpWebResponse)sReq.GetResponse())
-                        using (var r = new StreamReader(sRes.GetResponseStream(), Encoding.UTF8))
-                        {
-                            string sJson = r.ReadToEnd();
-                            var mId = Regex.Match(sJson, @"""id""\s*:\s*(\d+)");
-                            if (mId.Success)
-                            {
-                                sgdbGameId = int.Parse(mId.Groups[1].Value);
-                            }
-                        }
-
-                        if (sgdbGameId > 0)
-                        {
-                            string gridsUrl = "https://www.steamgriddb.com/api/v2/grids/game/" + sgdbGameId + "?dimensions=600x900,512x512,1024x1024,460x215,920x430";
-                            var gReq = (HttpWebRequest)WebRequest.Create(gridsUrl);
-                            gReq.Headers.Add("Authorization", "Bearer " + Settings.steamgriddb_api_key.Trim());
-                            gReq.UserAgent = "OrbisWebManager/1.0";
-                            gReq.Timeout = 6000;
-
-                            using (var gRes = (HttpWebResponse)gReq.GetResponse())
-                            using (var r = new StreamReader(gRes.GetResponseStream(), Encoding.UTF8))
-                            {
-                                string gJson = r.ReadToEnd();
-                                var ser = new JavaScriptSerializer();
-                                var d = ser.Deserialize<Dictionary<string, object>>(gJson);
-                                if (d.ContainsKey("data"))
-                                {
-                                    var grids = d["data"] as object[];
-                                    if (grids != null)
-                                    {
-                                        int count = 0;
-                                        foreach (object item in grids)
-                                        {
-                                            var g = item as Dictionary<string, object>;
-                                            if (g == null) continue;
-                                            if (count++ >= 24) break;
-
-                                            string authorName = "Comunidade";
-                                            if (g.ContainsKey("author"))
-                                            {
-                                                var auth = g["author"] as Dictionary<string, object>;
-                                                if (auth != null && auth.ContainsKey("name")) authorName = auth["name"].ToString();
-                                            }
-
-                                            sgdbGrids.Add(new
-                                            {
-                                                url = g.ContainsKey("url") ? g["url"].ToString() : "",
-                                                thumb = g.ContainsKey("thumb") ? g["thumb"].ToString() : "",
-                                                width = g.ContainsKey("width") ? g["width"] : 600,
-                                                height = g.ContainsKey("height") ? g["height"] : 900,
-                                                author = authorName
-                                            });
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    catch { }
-                }
-
-                SendJson(res, new
-                {
-                    id = id,
-                    title = title,
-                    sony = sonyCover,
-                    steamgriddb = new
-                    {
-                        hasKey = hasSgdbKey,
-                        grids = sgdbGrids
-                    }
-                });
-                return;
-            }
-
-            // 4.2 APPLY ONLINE COVER
-            if (path == "/api/game/covers/apply" && req.HttpMethod == "POST")
-            {
-                string id = "";
-                string imgUrl = "";
-
-                using (var r = new StreamReader(req.InputStream, Encoding.UTF8))
-                {
-                    string body = r.ReadToEnd();
-                    var ser = new JavaScriptSerializer();
-                    var d = ser.Deserialize<Dictionary<string, object>>(body);
-                    if (d.ContainsKey("id")) id = d["id"].ToString();
-                    if (d.ContainsKey("url")) imgUrl = d["url"].ToString();
-                }
-
-                if (string.IsNullOrEmpty(id) || string.IsNullOrEmpty(imgUrl))
-                {
-                    res.StatusCode = 400;
-                    SendJson(res, new { error = "Parâmetros 'id' e 'url' são obrigatórios." });
-                    return;
-                }
-
-                try
-                {
-                    byte[] imgBytes;
-                    using (var wc = new WebClient())
-                    {
-                        wc.Headers.Add("User-Agent", "Mozilla/5.0");
-                        imgBytes = wc.DownloadData(imgUrl);
-                    }
-
-                    if (imgBytes != null && imgBytes.Length > 0)
-                    {
-                        string iconCache = Path.Combine(IconsDir, id + ".png");
-                        File.WriteAllBytes(iconCache, imgBytes);
-
-                        // Upload to PS4 via FTP
-                        try
-                        {
-                            string remotePath = "/user/appmeta/" + id + "/icon0.png";
-                            using (var ms = new MemoryStream(imgBytes))
-                            {
-                                StreamFtpUpload(remotePath, ms, imgBytes.Length);
-                            }
-                        }
-                        catch { }
-
-                        SendJson(res, new
-                        {
-                            success = true,
-                            message = "Capa aplicada com sucesso!",
-                            iconUrl = "/api/game/icon?id=" + id + "&t=" + DateTime.Now.Ticks
-                        });
-                        return;
-                    }
-                    else
-                    {
-                        res.StatusCode = 500;
-                        SendJson(res, new { error = "Imagem vazia ou inválida recebida da URL." });
+                        Http.Error(res, 403, "Origem não permitida.");
                         return;
                     }
                 }
-                catch (Exception ex)
-                {
-                    res.StatusCode = 500;
-                    SendJson(res, new { error = "Falha ao baixar imagem: " + ex.Message });
-                    return;
-                }
             }
 
-            // 5. CAPTURE GALLERY (SCREENSHOTS)
-            if (path == "/api/captures/games")
+            switch (path)
             {
-                // List games that have captures in /user/av_contents/photo/NPXS20001/
-                List<object> captureGames = new List<object>();
-                try
-                {
-                    var folders = ListFtpDirectory("/user/av_contents/photo/NPXS20001/");
-                    foreach (var f in folders)
+                // ------------------------------------------------ status / dashboard
+                case "/api/status": Status(res); return;
+                case "/api/summary":
                     {
-                        if (f.isDir)
-                        {
-                            string gameId = f.name.ToUpper();
-                            string titleName = gameId;
-                            if (GameTitleCache.ContainsKey(gameId)) titleName = GameTitleCache[gameId];
+                        var s = Summary.Get(q["force"] == "1");
+                        if (s == null) Http.Json(res, new { username = "PlayStation 4", userId = "", users = new object[0], cheatCount = 0, pkgCount = 0, totalPkgSize = 0 });
+                        else Http.Json(res, s);
+                        return;
+                    }
+                case "/api/ports": Http.Json(res, Ps4Services.Diagnose()); return;
 
-                            captureGames.Add(new
+                // ------------------------------------------------ games
+                case "/api/games":
+                    {
+                        if (q["deep"] == "1") { Library.ClearTitleCache(); Covers.ForgetMissing(); }
+                        var snap = Library.Get(q["refresh"] == "1" || q["deep"] == "1");
+                        Http.Json(res, new
+                        {
+                            games = snap.games,
+                            updated = snap.updated == DateTime.MinValue ? "" : snap.updated.ToLocalTime().ToString("HH:mm:ss"),
+                            refreshing = Library.Refreshing,
+                            error = Library.LastError
+                        });
+                        return;
+                    }
+                case "/api/game/icon": GameIcon(ctx); return;
+                case "/api/game/details": GameDetails(res, Covers.SafeId(q["id"])); return;
+                case "/api/game/icon/upload":
+                    if (!post) break;
+                    {
+                        string id = Covers.SafeId(q["id"]);
+                        if (!TitleIdRx.IsMatch(id)) { Http.Error(res, 400, "Title ID inválido."); return; }
+                        byte[] img = Http.ReadBody(req, 30 * 1024 * 1024);
+                        Covers.Apply(id, img, q["target"] ?? "icon", q["fit"] ?? "cover");
+                        Library.MarkCoverChanged(id);
+                        Http.Json(res, new { success = true, iconUrl = Library.IconUrl(id) });
+                        return;
+                    }
+
+                // ------------------------------------------------ covers
+                case "/api/covers/search": CoverSearch(res, Covers.SafeId(q["id"]), q["title"] ?? ""); return;
+                case "/api/covers/sgdb":
+                    {
+                        int gid;
+                        int.TryParse(q["gameId"], out gid);
+                        if (gid <= 0 || !Covers.HasSgdbKey) { Http.Json(res, new { grids = new object[0] }); return; }
+                        Http.Json(res, new { grids = Covers.SgdbArt(gid, q["kind"] ?? "square") });
+                        return;
+                    }
+                case "/api/covers/apply":
+                    if (!post) break;
+                    {
+                        var d = Http.ReadJson(req);
+                        string id = Covers.SafeId(Http.Str(d, "id"));
+                        string url = Http.Str(d, "url");
+                        if (!TitleIdRx.IsMatch(id) || url.Length == 0) { Http.Error(res, 400, "Parâmetros 'id' e 'url' são obrigatórios."); return; }
+                        byte[] img = Covers.HttpGetBytes(url);
+                        string target = Http.Str(d, "target");
+                        Covers.Apply(id, img, target == "background" ? "background" : "icon", Http.Str(d, "fit") == "contain" ? "contain" : "cover");
+                        Library.MarkCoverChanged(id);
+                        Http.Json(res, new { success = true, iconUrl = Library.IconUrl(id) });
+                        return;
+                    }
+                case "/api/covers/restore":
+                    if (!post) break;
+                    {
+                        var d = Http.ReadJson(req);
+                        string id = Covers.SafeId(Http.Str(d, "id"));
+                        bool ok = Covers.Restore(id, Http.Str(d, "target") == "background" ? "background" : "icon");
+                        Library.MarkCoverChanged(id);
+                        if (!ok) { Http.Error(res, 404, "Nenhum backup da arte original encontrado para " + id + "."); return; }
+                        Http.Json(res, new { success = true, iconUrl = Library.IconUrl(id) });
+                        return;
+                    }
+                case "/api/covers/preview":
+                    if (!post) break;
+                    {
+                        // Renders exactly what will be sent to the console (512x512 or 1920x1080)
+                        var d = Http.ReadJson(req);
+                        byte[] img = Covers.HttpGetBytes(Http.Str(d, "url"));
+                        bool bg = Http.Str(d, "target") == "background";
+                        using (var src = Covers.LoadImage(img))
+                        using (var bmp = Covers.Render(src, bg ? 960 : 512, bg ? 540 : 512, Http.Str(d, "fit") == "contain" ? "contain" : "cover"))
+                        using (var ms = new MemoryStream())
+                        {
+                            bmp.Save(ms, System.Drawing.Imaging.ImageFormat.Jpeg);
+                            Http.Bytes(res, ms.ToArray(), "image/jpeg");
+                        }
+                        return;
+                    }
+
+                // ------------------------------------------------ captures
+                case "/api/captures/games": CaptureGames(res); return;
+                case "/api/captures": Captures(res, Covers.SafeId(q["game"]), q["refresh"] == "1"); return;
+                case "/api/capture/image": CaptureImage(ctx, q["path"], q["thumb"] == "1"); return;
+
+                // ------------------------------------------------ files
+                case "/api/files":
+                    {
+                        string dir = NormalizeDir(q["path"]);
+                        Http.Json(res, new { currentPath = dir, items = Ftp.List(dir) });
+                        return;
+                    }
+                case "/api/files/download": Download(ctx, q["path"]); return;
+                case "/api/files/upload":
+                    if (!post) break;
+                    {
+                        string dir = NormalizeDir(q["path"]);
+                        string name = q["filename"] ?? "";
+                        if (name.Length == 0 || name.IndexOfAny(new[] { '/', '\\' }) >= 0) { Http.Error(res, 400, "Nome de arquivo inválido."); return; }
+                        string remote = dir + name;
+                        Ftp.RunOnce("Enviando " + name, c => c.Store(remote, req.InputStream, null));
+                        Summary.Invalidate();
+                        Http.Json(res, new { success = true, path = remote });
+                        return;
+                    }
+                case "/api/files/delete":
+                    if (!post) break;
+                    {
+                        string target = q["path"] ?? "";
+                        if (target.Length < 2) { Http.Error(res, 400, "Caminho inválido."); return; }
+                        bool isDir = q["isDir"] == "true";
+                        try
+                        {
+                            Ftp.Run(c => c.Simple((isDir ? "RMD " : "DELE ") + target, 250, 200));
+                        }
+                        catch (FtpException ex)
+                        {
+                            Http.Error(res, 400, isDir ? "Não foi possível remover a pasta (ela precisa estar vazia)." : "Falha ao excluir: " + ex.Message);
+                            return;
+                        }
+                        Summary.Invalidate();
+                        Http.Json(res, new { success = true });
+                        return;
+                    }
+                case "/api/files/mkdir":
+                    if (!post) break;
+                    {
+                        string target = q["path"] ?? "";
+                        Ftp.Run(c => c.Simple("MKD " + target, 257, 250));
+                        Http.Json(res, new { success = true });
+                        return;
+                    }
+                case "/api/files/rename":
+                    if (!post) break;
+                    {
+                        string from = q["from"] ?? "", to = q["to"] ?? "";
+                        if (from.Length < 2 || to.Length < 2) { Http.Error(res, 400, "Caminho inválido."); return; }
+                        Ftp.Run(c => { c.Simple("RNFR " + from, 350); c.Simple("RNTO " + to, 250); });
+                        Http.Json(res, new { success = true });
+                        return;
+                    }
+
+                // ------------------------------------------------ cheats
+                case "/api/cheats": Cheats(res); return;
+                case "/api/cheat/read":
+                    {
+                        string p = q["path"] ?? "";
+                        string content = Ftp.TryDownloadText(p) ?? "";
+                        object parsed = null;
+                        try { parsed = new JavaScriptSerializer { MaxJsonLength = int.MaxValue }.DeserializeObject(content); } catch { }
+                        Http.Json(res, new { raw = content, data = parsed });
+                        return;
+                    }
+                case "/api/cheat/convert":
+                    if (!post) break;
+                    {
+                        var d = Http.ReadJson(req);
+                        string sourceId = Http.Str(d, "sourceId").Trim().ToUpperInvariant();
+                        string targetId = Http.Str(d, "targetId").Trim().ToUpperInvariant();
+                        string version = Http.Str(d, "version").Trim();
+                        string raw = Http.Str(d, "json");
+                        if (!TitleIdRx.IsMatch(sourceId) || !TitleIdRx.IsMatch(targetId)) { Http.Error(res, 400, "Title IDs inválidos (formato CUSA00000)."); return; }
+                        if (!Regex.IsMatch(version, @"^\d{2}\.\d{2}$")) { Http.Error(res, 400, "Versão inválida (formato 01.00)."); return; }
+                        try { new JavaScriptSerializer { MaxJsonLength = int.MaxValue }.DeserializeObject(raw); }
+                        catch { Http.Error(res, 400, "O arquivo selecionado não é um JSON válido."); return; }
+                        string adapted = Regex.Replace(raw, Regex.Escape(sourceId), targetId, RegexOptions.IgnoreCase);
+                        string fileName = targetId + "_" + version + ".json";
+                        string remote = "/data/GoldHEN/cheats/json/" + fileName;
+                        Ftp.Upload(remote, Encoding.UTF8.GetBytes(adapted));
+                        Summary.Invalidate();
+                        Http.Json(res, new { success = true, filename = fileName, path = remote });
+                        return;
+                    }
+
+                // ------------------------------------------------ pkgs
+                case "/api/pkgs":
+                    {
+                        var list = new List<object>();
+                        foreach (var f in Ftp.TryList("/data/pkg/"))
+                            if (!f.isDir && f.name.EndsWith(".pkg", StringComparison.OrdinalIgnoreCase))
+                                list.Add(new { name = f.name, size = f.size, date = f.date, path = "/data/pkg/" + f.name });
+                        Http.Json(res, list);
+                        return;
+                    }
+                case "/api/pc/pkgs": PcPkgs(res); return;
+
+                // ------------------------------------------------ console services
+                case "/api/payload":
+                    if (!post) break;
+                    {
+                        byte[] payload = Http.ReadBody(req, 64 * 1024 * 1024);
+                        if (payload.Length == 0) { Http.Error(res, 400, "Arquivo vazio."); return; }
+                        try
+                        {
+                            Ps4Services.SendPayload(payload);
+                            Http.Json(res, new { success = true, message = "Payload enviado (" + payload.Length + " bytes) para a porta " + Program.Settings.payload_port + "." });
+                        }
+                        catch (Exception ex) { Http.Error(res, 502, ex.Message); }
+                        return;
+                    }
+                case "/api/system/notify":
+                    if (!post) break;
+                    {
+                        string msg = Http.Str(Http.ReadJson(req), "message").Trim();
+                        if (msg.Length == 0) { Http.Error(res, 400, "Digite uma mensagem."); return; }
+                        if (msg.Length > 400) msg = msg.Substring(0, 400);
+                        try
+                        {
+                            Ps4Services.Notify(msg);
+                            Http.Json(res, new { success = true });
+                        }
+                        catch (Exception ex)
+                        {
+                            Http.Json(res, new
                             {
-                                id = gameId,
-                                name = titleName,
-                                iconUrl = "/api/game/icon?id=" + gameId
+                                success = false,
+                                needsPs4Debug = ex.Message == "NO_PS4DEBUG",
+                                error = ex.Message == "NO_PS4DEBUG"
+                                    ? "O ps4debug não está rodando no PS4 (porta 744 fechada). Carregue o payload ps4debug e tente de novo."
+                                    : "Falha ao enviar: " + ex.Message
                             });
                         }
+                        return;
                     }
-                }
-                catch { }
-
-                SendJson(res, captureGames);
-                return;
-            }
-
-            if (path == "/api/captures")
-            {
-                string targetGame = query["game"];
-                List<CaptureItem> items = new List<CaptureItem>();
-                string baseFolder = "/user/av_contents/photo/NPXS20001/";
-
-                try
-                {
-                    List<string> gamesToScan = new List<string>();
-                    if (!string.IsNullOrEmpty(targetGame))
+                case "/api/system/rpi":
+                    if (!post) break;
                     {
-                        gamesToScan.Add(targetGame);
-                    }
-                    else
-                    {
-                        var folders = ListFtpDirectory(baseFolder);
-                        if (folders.Count > 0) gamesToScan.Add(folders[0].name);
-                    }
-
-                    foreach (var g in gamesToScan)
-                    {
-                        string gFolder = baseFolder + g + "/";
-                        var subFolders = ListFtpDirectory(gFolder);
-                        if (subFolders.Count > 10)
+                        var d = Http.ReadJson(req);
+                        string url = Http.Str(d, "url");
+                        string file = Http.Str(d, "file");
+                        if (file.Length > 0)
                         {
-                            subFolders = subFolders.GetRange(subFolders.Count - 10, 10);
+                            if (!LanCheck(res)) return;
+                            url = "http://" + Ps4Services.LocalIpTowardsConsole() + ":" + Program.Settings.http_port + "/pcpkg/" + Uri.EscapeDataString(file);
                         }
-
-                        foreach (var sf in subFolders)
+                        if (!url.StartsWith("http://") && !url.StartsWith("https://")) { Http.Error(res, 400, "Informe uma URL http:// válida para o .pkg."); return; }
+                        try
                         {
-                            if (sf.isDir)
+                            string r = Ps4Services.RpiCall("install", new { type = "direct", packages = new[] { url } });
+                            var parsed = new JavaScriptSerializer().DeserializeObject(r) as Dictionary<string, object>;
+                            bool ok = parsed != null && parsed.ContainsKey("status") && Convert.ToString(parsed["status"]) == "success";
+                            Http.Json(res, new
                             {
-                                string shotFolder = gFolder + sf.name + "/";
-                                var shotFiles = ListFtpDirectory(shotFolder);
-                                foreach (var file in shotFiles)
-                                {
-                                    if (file.name.EndsWith(".jpg", StringComparison.OrdinalIgnoreCase))
-                                    {
-                                        string shotPath = shotFolder + file.name;
-                                        items.Add(new CaptureItem
-                                        {
-                                            titleId = g,
-                                            fileName = file.name,
-                                            fullPath = shotPath,
-                                            imageUrl = "/api/capture/image?path=" + Uri.EscapeDataString(shotPath)
-                                        });
-                                    }
-                                }
-                            }
+                                success = ok,
+                                taskId = parsed != null && parsed.ContainsKey("task_id") ? parsed["task_id"] : null,
+                                title = parsed != null && parsed.ContainsKey("title") ? parsed["title"] : null,
+                                url = url,
+                                error = ok ? null : "O Package Installer recusou: " + r
+                            });
                         }
+                        catch (Exception ex) { Http.Error(res, 502, ex.Message); }
+                        return;
                     }
-                }
-                catch { }
-
-                items.Reverse();
-                SendJson(res, items);
-                return;
-            }
-
-            if (path == "/api/capture/image")
-            {
-                string shotPath = query["path"];
-                if (string.IsNullOrEmpty(shotPath)) { res.StatusCode = 400; res.Close(); return; }
-
-                string fileName = Path.GetFileName(shotPath);
-                string localCache = Path.Combine(CapturesDir, fileName);
-
-                if (!File.Exists(localCache))
-                {
-                    try
+                case "/api/system/rpi/progress":
                     {
-                        DownloadFtpFile(shotPath, localCache);
+                        long task;
+                        long.TryParse(q["task"], out task);
+                        try { Http.Bytes(res, Encoding.UTF8.GetBytes(Ps4Services.RpiCall("get_task_progress", new { task_id = task })), "application/json; charset=utf-8"); }
+                        catch (Exception ex) { Http.Error(res, 502, ex.Message); }
+                        return;
                     }
-                    catch
+
+                // ------------------------------------------------ settings / misc
+                case "/api/config":
                     {
-                        res.StatusCode = 404;
+                        if (post)
+                        {
+                            var d = Http.ReadJson(req);
+                            string oldIp = Program.Settings.ps4_ip;
+                            int oldPort = Program.Settings.ftp_port;
+                            string ip = Http.Str(d, "ps4_ip").Trim();
+                            IPAddress parsedIp;
+                            if (ip.Length > 0)
+                            {
+                                if (!IPAddress.TryParse(ip, out parsedIp)) { Http.Error(res, 400, "IP inválido."); return; }
+                                Program.Settings.ps4_ip = ip;
+                            }
+                            int n;
+                            if (int.TryParse(Http.Str(d, "ftp_port"), out n) && n > 0 && n < 65536) Program.Settings.ftp_port = n;
+                            if (int.TryParse(Http.Str(d, "payload_port"), out n) && n > 0 && n < 65536) Program.Settings.payload_port = n;
+                            if (d.ContainsKey("ps4_fw") && Http.Str(d, "ps4_fw").Length > 0) Program.Settings.ps4_fw = Http.Str(d, "ps4_fw").Trim();
+                            if (d.ContainsKey("active_user")) Program.Settings.active_user = Http.Str(d, "active_user");
+                            if (d.ContainsKey("steamgriddb_api_key")) Program.Settings.steamgriddb_api_key = Http.Str(d, "steamgriddb_api_key").Trim();
+                            if (d.ContainsKey("pc_pkg_folder")) Program.Settings.pc_pkg_folder = Http.Str(d, "pc_pkg_folder").Trim().Trim('"');
+                            Program.Settings.Save(Program.ConfigPath);
+                            if (oldIp != Program.Settings.ps4_ip || oldPort != Program.Settings.ftp_port)
+                            {
+                                Ftp.Reset();
+                                Library.RefreshAsync();
+                            }
+                            Summary.Invalidate();
+                            lock (statusLock) statusAt = DateTime.MinValue;
+                        }
+                        var s = Program.Settings;
+                        Http.Json(res, new
+                        {
+                            ps4_ip = s.ps4_ip,
+                            ftp_port = s.ftp_port,
+                            payload_port = s.payload_port,
+                            http_port = s.http_port,
+                            ps4_fw = s.ps4_fw,
+                            active_user = s.active_user,
+                            pc_pkg_folder = s.pc_pkg_folder,
+                            // never send the key back to the browser, only whether it is set
+                            has_sgdb_key = Covers.HasSgdbKey
+                        });
+                        return;
+                    }
+                case "/api/network":
+                    {
+                        var ips = Ps4Services.LocalIps();
+                        Http.Json(res, new { pcIps = ips, httpPort = Program.Settings.http_port, ps4Ip = Program.Settings.ps4_ip, lanAccess = Program.LanAccess });
+                        return;
+                    }
+                case "/api/backup/appdb":
+                    {
+                        res.SendChunked = true;
+                        res.ContentType = "application/octet-stream";
+                        res.Headers["Content-Disposition"] = Http.ContentDisposition("app_db_backup_" + DateTime.Now.ToString("yyyyMMdd_HHmmss") + ".db");
+                        Ftp.RunOnce("Backup app.db", c => c.Retrieve("/system_data/priv/mms/app.db", res.OutputStream, 0));
                         res.Close();
                         return;
                     }
-                }
-
-                if (File.Exists(localCache))
-                {
-                    res.ContentType = "image/jpeg";
-                    byte[] b = File.ReadAllBytes(localCache);
-                    res.ContentLength64 = b.Length;
-                    res.OutputStream.Write(b, 0, b.Length);
-                    res.Close();
-                }
-                else
-                {
-                    res.StatusCode = 404;
-                    res.Close();
-                }
-                return;
             }
 
-            // 6. FILES
-            if (path == "/api/files")
-            {
-                string dir = query["path"];
-                if (string.IsNullOrEmpty(dir)) dir = "/data/";
-                if (!dir.EndsWith("/")) dir += "/";
+            Http.Error(res, 404, "Endpoint desconhecido: " + path);
+        }
 
-                var list = ListFtpDirectory(dir);
-                SendJson(res, new
-                {
-                    currentPath = dir,
-                    items = list
-                });
+        // ================================================================ handlers
+
+        static void Status(HttpListenerResponse res)
+        {
+            object cached = null;
+            lock (statusLock)
+            {
+                if ((DateTime.UtcNow - statusAt).TotalSeconds < 3) cached = statusCache;
+            }
+            if (cached != null) { Http.Json(res, cached); return; }
+
+            long ping = Ps4Services.Ping(700);
+            bool? ftp = Ftp.TryPing(1500);
+            bool ftpOk = ftp != false; // null == busy, which means it is up
+            string banner = Ftp.LastBanner ?? "";
+            string hen = "GoldHEN";
+            var m = Regex.Match(banner, @"GoldHEN[^\r\n]*?v?(\d+(\.\d+)+\w*)", RegexOptions.IgnoreCase);
+            if (m.Success) hen = "GoldHEN v" + m.Groups[1].Value;
+
+            var s = new
+            {
+                online = ping >= 0 || ftpOk,
+                ping = ping,
+                ip = Program.Settings.ps4_ip,
+                ftpPort = Program.Settings.ftp_port,
+                ftpOk = ftpOk,
+                ftpBusy = ftp == null,
+                transfer = Ftp.CurrentTransfer,
+                banner = banner,
+                goldhenVer = hen,
+                fw = Program.Settings.ps4_fw,
+                username = string.IsNullOrEmpty(Summary.ActiveUserName) ? "PlayStation 4" : Summary.ActiveUserName,
+                lanAccess = Program.LanAccess,
+                version = Program.AppVersion
+            };
+            lock (statusLock) { statusCache = s; statusAt = DateTime.UtcNow; }
+            Http.Json(res, s);
+        }
+
+        static void GameIcon(HttpListenerContext ctx)
+        {
+            string id = Covers.SafeId(ctx.Request.QueryString["id"]);
+            string file = Covers.GetIcon(id);
+            if (file == null)
+            {
+                ctx.Response.StatusCode = 404;
+                ctx.Response.Close();
                 return;
             }
+            byte[] b = File.ReadAllBytes(file);
+            // URL carries ?v=<timestamp>, so the browser may cache it for a long time
+            ctx.Response.Headers["Cache-Control"] = "public, max-age=604800";
+            Http.Bytes(ctx.Response, b, Covers.SniffImageType(b));
+        }
 
-            if (path == "/api/files/download")
+        static void GameDetails(HttpListenerResponse res, string id)
+        {
+            if (!TitleIdRx.IsMatch(id)) { Http.Error(res, 400, "Title ID inválido."); return; }
+            var meta = Library.MetaOf(id);
+            long appSize = 0, patchSize = 0;
+            foreach (var f in Ftp.TryList("/user/app/" + id + "/"))
+                if (f.name.EndsWith(".pkg", StringComparison.OrdinalIgnoreCase)) appSize += f.size;
+            foreach (var f in Ftp.TryList("/user/patch/" + id + "/"))
+                if (f.name.EndsWith(".pkg", StringComparison.OrdinalIgnoreCase)) patchSize += f.size;
+            var cheats = new List<string>();
+            foreach (var f in Ftp.TryList("/data/GoldHEN/cheats/json/"))
+                if (f.name.StartsWith(id, StringComparison.OrdinalIgnoreCase)) cheats.Add(f.name);
+            var appmeta = Ftp.TryList("/user/appmeta/" + id + "/");
+            bool hasPic1 = appmeta.Exists(f => f.name == "pic1.png");
+            Http.Json(res, new
             {
-                string filePath = query["path"];
-                if (string.IsNullOrEmpty(filePath)) { res.StatusCode = 400; res.Close(); return; }
+                id = id,
+                name = Library.TitleOf(id),
+                version = meta != null ? meta.version : "",
+                contentId = meta != null ? meta.contentId : "",
+                category = meta != null ? meta.category : "",
+                appSize = appSize,
+                patchSize = patchSize,
+                cheats = cheats,
+                hasPic1 = hasPic1,
+                customCover = Covers.HasOriginalBackup(id),
+                iconUrl = Library.IconUrl(id)
+            });
+        }
 
-                string fileName = Path.GetFileName(filePath);
-                res.ContentType = "application/octet-stream";
-                res.Headers.Add("Content-Disposition", "attachment; filename=\"" + fileName + "\"");
-
-                StreamFtpDownload(filePath, res.OutputStream);
-                res.Close();
-                return;
+        static void CoverSearch(HttpListenerResponse res, string id, string title)
+        {
+            object sony = null;
+            if (id.StartsWith("CUSA"))
+            {
+                var si = Covers.SonyInfo(id);
+                if (si != null && !string.IsNullOrEmpty(si.icon))
+                    sony = new { icon = si.icon, background = si.background, name = si.name };
             }
 
-            if (path == "/api/files/upload" && req.HttpMethod == "POST")
+            List<object> games = new List<object>();
+            List<object> grids = new List<object>();
+            object selected = null;
+            string sgdbError = null;
+            if (Covers.HasSgdbKey)
             {
-                string targetPath = query["path"];
-                string fileName = query["filename"];
-
-                if (string.IsNullOrEmpty(targetPath) || string.IsNullOrEmpty(fileName))
+                try
                 {
-                    res.StatusCode = 400;
-                    SendJson(res, new { error = "Parâmetros 'path' e 'filename' são obrigatórios." });
+                    games = Covers.SgdbSearch(string.IsNullOrWhiteSpace(title) ? Library.TitleOf(id) : title);
+                    if (games.Count > 0)
+                    {
+                        dynamicId(games[0], out selected);
+                        grids = Covers.SgdbArt((int)selected, "square");
+                        if (grids.Count == 0) grids = Covers.SgdbArt((int)selected, "all");
+                    }
+                }
+                catch (Exception ex) { sgdbError = ex.Message; }
+            }
+
+            Http.Json(res, new
+            {
+                id = id,
+                title = title,
+                sony = sony,
+                steamgriddb = new { hasKey = Covers.HasSgdbKey, games = games, selectedGameId = selected, grids = grids, error = sgdbError }
+            });
+        }
+
+        // Anonymous types from SgdbSearch: read their "id" via reflection
+        static void dynamicId(object game, out object id)
+        {
+            id = Convert.ToInt32(game.GetType().GetProperty("id").GetValue(game, null));
+        }
+
+        static void CaptureGames(HttpListenerResponse res)
+        {
+            var list = new List<object>();
+            foreach (var f in Ftp.TryList("/user/av_contents/photo/NPXS20001/"))
+            {
+                if (!f.isDir) continue;
+                string gid = f.name.ToUpperInvariant();
+                list.Add(new { id = gid, name = Library.TitleOf(gid), iconUrl = Library.IconUrl(gid), date = f.date, sort = Program.ParseFtpDate(f.date).Ticks });
+            }
+            // most recent first
+            list.Sort((a, b) => ((long)b.GetType().GetProperty("sort").GetValue(b, null)).CompareTo((long)a.GetType().GetProperty("sort").GetValue(a, null)));
+            Http.Json(res, list);
+        }
+
+        static void Captures(HttpListenerResponse res, string game, bool refresh)
+        {
+            if (game.Length == 0) { Http.Json(res, new object[0]); return; }
+            lock (captureCache)
+            {
+                KeyValuePair<DateTime, object> c;
+                if (!refresh && captureCache.TryGetValue(game, out c) && (DateTime.UtcNow - c.Key).TotalMinutes < 3)
+                {
+                    Http.Json(res, c.Value);
                     return;
                 }
-
-                if (!targetPath.EndsWith("/")) targetPath += "/";
-                string fullRemotePath = targetPath + fileName;
-
-                long len = req.ContentLength64;
-                StreamFtpUpload(fullRemotePath, req.InputStream, len);
-
-                SendJson(res, new { success = true, path = fullRemotePath });
-                return;
             }
+            string baseDir = "/user/av_contents/photo/NPXS20001/" + game + "/";
+            var subs = Ftp.TryList(baseDir).FindAll(f => f.isDir);
+            subs.Sort((a, b) => Program.ParseFtpDate(b.date).CompareTo(Program.ParseFtpDate(a.date)));
+            if (subs.Count > 40) subs = subs.GetRange(0, 40);
 
-            if (path == "/api/files/delete" && req.HttpMethod == "POST")
+            var items = new List<object>();
+            foreach (var sf in subs)
             {
-                string targetPath = query["path"];
-                bool isDir = query["isDir"] == "true";
-
-                if (isDir)
+                string dir = baseDir + sf.name + "/";
+                foreach (var file in Ftp.TryList(dir))
                 {
-                    ExecuteFtpCommand(targetPath, WebRequestMethods.Ftp.RemoveDirectory);
-                }
-                else
-                {
-                    ExecuteFtpCommand(targetPath, WebRequestMethods.Ftp.DeleteFile);
-                }
-
-                SendJson(res, new { success = true });
-                return;
-            }
-
-            if (path == "/api/files/mkdir" && req.HttpMethod == "POST")
-            {
-                string targetPath = query["path"];
-                ExecuteFtpCommand(targetPath, WebRequestMethods.Ftp.MakeDirectory);
-                SendJson(res, new { success = true });
-                return;
-            }
-
-            // 7. CHEATS
-            if (path == "/api/cheats")
-            {
-                var files = ListFtpDirectory("/data/GoldHEN/cheats/json/");
-                List<object> list = new List<object>();
-
-                foreach (var f in files)
-                {
-                    if (f.name.EndsWith(".json", StringComparison.OrdinalIgnoreCase))
+                    if (!file.name.EndsWith(".jpg", StringComparison.OrdinalIgnoreCase)) continue;
+                    string full = dir + file.name;
+                    string enc = Uri.EscapeDataString(full);
+                    items.Add(new
                     {
-                        var m = Regex.Match(f.name, @"^([A-Z0-9_]{9})_([0-9\.]+)\.json$");
-                        string titleId = m.Success ? m.Groups[1].Value : "";
-                        string version = m.Success ? m.Groups[2].Value : "";
-                        string gameName = titleId;
-                        if (GameTitleCache.ContainsKey(titleId)) gameName = GameTitleCache[titleId];
-
-                        list.Add(new
-                        {
-                            filename = f.name,
-                            path = "/data/GoldHEN/cheats/json/" + f.name,
-                            titleId = titleId,
-                            version = version,
-                            gameName = gameName,
-                            size = f.size,
-                            date = f.date
-                        });
-                    }
-                }
-
-                SendJson(res, list);
-                return;
-            }
-
-            if (path == "/api/cheat/read")
-            {
-                string cheatPath = query["path"];
-                string content = DownloadFtpText(cheatPath);
-                var serializer = new JavaScriptSerializer();
-                object parsed = null;
-                try
-                {
-                    parsed = serializer.DeserializeObject(content);
-                }
-                catch { }
-
-                SendJson(res, new
-                {
-                    raw = content,
-                    data = parsed
-                });
-                return;
-            }
-
-            if (path == "/api/cheat/convert" && req.HttpMethod == "POST")
-            {
-                string body = "";
-                using (var r = new StreamReader(req.InputStream, Encoding.UTF8))
-                {
-                    body = r.ReadToEnd();
-                }
-
-                var serializer = new JavaScriptSerializer();
-                var dict = serializer.Deserialize<Dictionary<string, object>>(body);
-
-                string sourceId = (string)dict["sourceId"];
-                string targetId = (string)dict["targetId"];
-                string version = (string)dict["version"];
-                string rawJson = (string)dict["json"];
-
-                string adaptedJson = Regex.Replace(rawJson, sourceId, targetId, RegexOptions.IgnoreCase);
-
-                string remoteFileName = targetId.ToUpper() + "_" + version + ".json";
-                string remotePath = "/data/GoldHEN/cheats/json/" + remoteFileName;
-
-                UploadFtpText(remotePath, adaptedJson);
-
-                SendJson(res, new
-                {
-                    success = true,
-                    filename = remoteFileName,
-                    path = remotePath
-                });
-                return;
-            }
-
-            // 8. PKGS
-            if (path == "/api/pkgs")
-            {
-                var files = ListFtpDirectory("/data/pkg/");
-                List<object> pkgs = new List<object>();
-
-                foreach (var f in files)
-                {
-                    if (!f.isDir && f.name.EndsWith(".pkg", StringComparison.OrdinalIgnoreCase))
-                    {
-                        pkgs.Add(new
-                        {
-                            name = f.name,
-                            size = f.size,
-                            date = f.date,
-                            path = "/data/pkg/" + f.name
-                        });
-                    }
-                }
-
-                SendJson(res, pkgs);
-                return;
-            }
-
-            // 9. PAYLOAD
-            if (path == "/api/payload" && req.HttpMethod == "POST")
-            {
-                byte[] payloadBytes;
-                using (var ms = new MemoryStream())
-                {
-                    req.InputStream.CopyTo(ms);
-                    payloadBytes = ms.ToArray();
-                }
-
-                try
-                {
-                    using (TcpClient client = new TcpClient())
-                    {
-                        client.Connect(Settings.ps4_ip, Settings.payload_port);
-                        using (NetworkStream stream = client.GetStream())
-                        {
-                            stream.Write(payloadBytes, 0, payloadBytes.Length);
-                        }
-                    }
-                    SendJson(res, new { success = true, message = "Payload enviado para a porta " + Settings.payload_port + "!" });
-                }
-                catch (Exception ex)
-                {
-                    res.StatusCode = 500;
-                    SendJson(res, new { success = false, error = "Falha ao enviar payload: " + ex.Message });
-                }
-                return;
-            }
-
-            // 10. CONFIG
-            if (path == "/api/config")
-            {
-                if (req.HttpMethod == "POST")
-                {
-                    using (var r = new StreamReader(req.InputStream, Encoding.UTF8))
-                    {
-                        string body = r.ReadToEnd();
-                        var serializer = new JavaScriptSerializer();
-                        var newCfg = serializer.Deserialize<Config>(body);
-                        if (!string.IsNullOrEmpty(newCfg.ps4_ip)) Settings.ps4_ip = newCfg.ps4_ip;
-                        if (newCfg.ftp_port > 0) Settings.ftp_port = newCfg.ftp_port;
-                        if (newCfg.payload_port > 0) Settings.payload_port = newCfg.payload_port;
-                        if (!string.IsNullOrEmpty(newCfg.ps4_fw)) Settings.ps4_fw = newCfg.ps4_fw;
-                        if (newCfg.active_user != null) Settings.active_user = newCfg.active_user;
-                        if (newCfg.steamgriddb_api_key != null) Settings.steamgriddb_api_key = newCfg.steamgriddb_api_key;
-                        Settings.Save(ConfigPath);
-                    }
-                }
-
-                SendJson(res, Settings);
-                return;
-            }
-
-            // 11. NETWORK
-            if (path == "/api/network")
-            {
-                List<string> ips = new List<string>();
-                try
-                {
-                    foreach (var ip in Dns.GetHostAddresses(Dns.GetHostName()))
-                    {
-                        if (ip.AddressFamily == AddressFamily.InterNetwork && !IPAddress.IsLoopback(ip))
-                        {
-                            ips.Add(ip.ToString());
-                        }
-                    }
-                }
-                catch { }
-
-                SendJson(res, new
-                {
-                    pcIps = ips,
-                    httpPort = Settings.http_port,
-                    ps4Ip = Settings.ps4_ip
-                });
-                return;
-            }
-
-            // 12. BACKUP APP.DB
-            if (path == "/api/backup/appdb")
-            {
-                res.ContentType = "application/octet-stream";
-                string timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
-                res.Headers.Add("Content-Disposition", "attachment; filename=\"app_db_backup_" + timestamp + ".db\"");
-                StreamFtpDownload("/system_data/priv/mms/app.db", res.OutputStream);
-                res.Close();
-                return;
-            }
-
-            // 13. SYSTEM NOTIFY (TV OSD)
-            if (path == "/api/system/notify" && req.HttpMethod == "POST")
-            {
-                string msg = "";
-                using (var r = new StreamReader(req.InputStream, Encoding.UTF8))
-                {
-                    string body = r.ReadToEnd();
-                    var serializer = new JavaScriptSerializer();
-                    var d = serializer.Deserialize<Dictionary<string, object>>(body);
-                    if (d.ContainsKey("message")) msg = d["message"].ToString();
-                }
-
-                if (string.IsNullOrEmpty(msg))
-                {
-                    res.StatusCode = 400;
-                    SendJson(res, new { error = "Mensagem não informada." });
-                    return;
-                }
-
-                // Probe if port 9090 is actually open
-                bool portOpen = false;
-                try
-                {
-                    using (var c = new TcpClient())
-                    {
-                        var ar = c.BeginConnect(Settings.ps4_ip, Settings.payload_port, null, null);
-                        portOpen = ar.AsyncWaitHandle.WaitOne(800) && c.Connected;
-                        if (portOpen) c.EndConnect(ar);
-                    }
-                }
-                catch { }
-
-                if (!portOpen)
-                {
-                    SendJson(res, new
-                    {
-                        success = false,
-                        error = "A porta " + Settings.payload_port + " (BinLoader Server) está desativada no seu PS4. No console, vá em 'Configurações > GoldHEN' e marque 'Enable BinLoader Server'."
+                        titleId = game,
+                        fileName = file.name,
+                        fullPath = full,
+                        size = file.size,
+                        imageUrl = "/api/capture/image?path=" + enc,
+                        thumbUrl = "/api/capture/image?thumb=1&path=" + enc
                     });
-                    return;
                 }
+            }
+            // File names start with yyyyMMdd_HHmmss -> sort newest first
+            items.Sort((a, b) => string.CompareOrdinal(
+                (string)b.GetType().GetProperty("fileName").GetValue(b, null),
+                (string)a.GetType().GetProperty("fileName").GetValue(a, null)));
+            lock (captureCache) captureCache[game] = new KeyValuePair<DateTime, object>(DateTime.UtcNow, items);
+            Http.Json(res, items);
+        }
 
-                bool sent = false;
-                try
-                {
-                    using (var c = new TcpClient())
-                    {
-                        c.Connect(Settings.ps4_ip, Settings.payload_port);
-                        byte[] notifyBytes = Encoding.UTF8.GetBytes(msg + "\0");
-                        c.GetStream().Write(notifyBytes, 0, notifyBytes.Length);
-                        sent = true;
-                    }
-                }
-                catch (Exception ex)
-                {
-                    SendJson(res, new { success = false, error = "Falha ao enviar para porta " + Settings.payload_port + ": " + ex.Message });
-                    return;
-                }
+        static string Hash(string s)
+        {
+            using (var md5 = MD5.Create())
+                return BitConverter.ToString(md5.ComputeHash(Encoding.UTF8.GetBytes(s))).Replace("-", "").Substring(0, 16);
+        }
 
-                SendJson(res, new { success = sent, delivered = sent, message = msg });
+        static void CaptureImage(HttpListenerContext ctx, string shotPath, bool thumb)
+        {
+            if (string.IsNullOrEmpty(shotPath) || !shotPath.StartsWith("/user/av_contents/") || shotPath.Contains(".."))
+            {
+                Http.Error(ctx.Response, 400, "Caminho inválido.");
                 return;
             }
-
-            // 14. REMOTE PACKAGE INSTALLER (RPI - Port 12800)
-            if (path == "/api/system/rpi" && req.HttpMethod == "POST")
+            string key = Hash(shotPath);
+            string full = Path.Combine(Program.CapturesDir, Path.GetFileNameWithoutExtension(shotPath) + "_" + key + ".jpg");
+            if (!File.Exists(full)) Ftp.DownloadToFile(shotPath, full);
+            string file = full;
+            if (thumb)
             {
-                string pkgUrl = "";
-                using (var r = new StreamReader(req.InputStream, Encoding.UTF8))
+                string t = Path.Combine(Program.CapturesDir, "thumbs", key + ".jpg");
+                if (!File.Exists(t))
                 {
-                    string body = r.ReadToEnd();
-                    var serializer = new JavaScriptSerializer();
-                    var d = serializer.Deserialize<Dictionary<string, object>>(body);
-                    if (d.ContainsKey("url")) pkgUrl = d["url"].ToString();
+                    try { File.WriteAllBytes(t, Covers.Thumbnail(File.ReadAllBytes(full), 480)); }
+                    catch { t = full; }
                 }
-
-                try
-                {
-                    var httpReq = (HttpWebRequest)WebRequest.Create("http://" + Settings.ps4_ip + ":12800/api/install");
-                    httpReq.Method = "POST";
-                    httpReq.ContentType = "application/json";
-                    httpReq.Timeout = 4000;
-                    string payload = new JavaScriptSerializer().Serialize(new { type = "direct", packages = new string[] { pkgUrl } });
-                    byte[] data = Encoding.UTF8.GetBytes(payload);
-                    httpReq.ContentLength = data.Length;
-                    using (var s = httpReq.GetRequestStream())
-                    {
-                        s.Write(data, 0, data.Length);
-                    }
-                    using (var r = (HttpWebResponse)httpReq.GetResponse())
-                    {
-                        SendJson(res, new { success = true, status = (int)r.StatusCode });
-                        return;
-                    }
-                }
-                catch (Exception ex)
-                {
-                    SendJson(res, new { success = false, error = "RPI (Porta 12800): " + ex.Message });
-                    return;
-                }
+                file = t;
             }
-
-            res.StatusCode = 404;
-            SendJson(res, new { error = "Endpoint desconhecido" });
+            ctx.Response.Headers["Cache-Control"] = "public, max-age=2592000";
+            Http.Bytes(ctx.Response, File.ReadAllBytes(file), "image/jpeg");
         }
 
-        #region FTP Operations (Synchronized with FtpLock)
-
-        static string BuildFtpUri(string remotePath)
+        static string NormalizeDir(string dir)
         {
-            if (!remotePath.StartsWith("/")) remotePath = "/" + remotePath;
-            return "ftp://" + Settings.ps4_ip + ":" + Settings.ftp_port + remotePath;
+            if (string.IsNullOrEmpty(dir)) dir = "/data/";
+            if (!dir.StartsWith("/")) dir = "/" + dir;
+            if (!dir.EndsWith("/")) dir += "/";
+            return dir;
         }
 
-        public static List<FtpItem> ListFtpDirectory(string path)
+        static void Download(HttpListenerContext ctx, string filePath)
         {
-            lock (FtpLock)
+            var res = ctx.Response;
+            if (string.IsNullOrEmpty(filePath)) { Http.Error(res, 400, "Caminho obrigatório."); return; }
+            string name = filePath.Substring(filePath.LastIndexOf('/') + 1);
+            Ftp.RunOnce("Baixando " + name, c =>
             {
-                List<FtpItem> items = new List<FtpItem>();
-                string uri = BuildFtpUri(path);
-                var req = (FtpWebRequest)WebRequest.Create(uri);
-                req.Method = WebRequestMethods.Ftp.ListDirectoryDetails;
-                req.KeepAlive = false;
-                req.UsePassive = true;
-                req.Timeout = 10000;
-                req.ReadWriteTimeout = 10000;
+                long size = c.Size(filePath);
+                res.ContentType = "application/octet-stream";
+                res.Headers["Content-Disposition"] = Http.ContentDisposition(name);
+                if (size >= 0) res.ContentLength64 = size; else res.SendChunked = true;
+                c.Retrieve(filePath, res.OutputStream, 0);
+            });
+            res.Close();
+        }
 
-                try
+        static void Cheats(HttpListenerResponse res)
+        {
+            var list = new List<object>();
+            foreach (var f in Ftp.List("/data/GoldHEN/cheats/json/"))
+            {
+                if (f.isDir || !f.name.EndsWith(".json", StringComparison.OrdinalIgnoreCase)) continue;
+                var m = Regex.Match(f.name, @"^([A-Z]{4}\d{5})_([0-9\.]+)\.json$", RegexOptions.IgnoreCase);
+                string tid = m.Success ? m.Groups[1].Value.ToUpperInvariant() : "";
+                list.Add(new
                 {
-                    using (var res = (FtpWebResponse)req.GetResponse())
-                    using (var reader = new StreamReader(res.GetResponseStream(), Encoding.UTF8))
-                    {
-                        string line;
-                        var regex = new Regex(@"^([drwx\-]{10})\s+(\d+)\s+(\S+)\s+(\S+)\s+(\d+)\s+([A-Za-z]{3}\s+\d+\s+[\d:]+)\s+(.+)$");
-                        while ((line = reader.ReadLine()) != null)
-                        {
-                            var m = regex.Match(line);
-                            if (m.Success)
-                            {
-                                string perm = m.Groups[1].Value;
-                                long size = long.Parse(m.Groups[5].Value);
-                                string date = m.Groups[6].Value;
-                                string name = m.Groups[7].Value.Trim();
-
-                                if (name == "." || name == "..") continue;
-
-                                items.Add(new FtpItem
-                                {
-                                    name = name,
-                                    isDir = perm.StartsWith("d"),
-                                    size = size,
-                                    date = date,
-                                    permissions = perm
-                                });
-                            }
-                        }
-                    }
-                }
-                catch { }
-
-                items.Sort((a, b) =>
-                {
-                    if (a.isDir && !b.isDir) return -1;
-                    if (!a.isDir && b.isDir) return 1;
-                    return a.name.CompareTo(b.name);
+                    filename = f.name,
+                    path = "/data/GoldHEN/cheats/json/" + f.name,
+                    titleId = tid,
+                    version = m.Success ? m.Groups[2].Value : "",
+                    gameName = tid.Length > 0 ? Library.TitleOf(tid) : f.name,
+                    installed = tid.Length > 0 && Library.MetaOf(tid) != null,
+                    size = f.size,
+                    date = f.date
                 });
-
-                return items;
             }
+            Http.Json(res, list);
         }
 
-        public static string DownloadFtpText(string remotePath)
+        static bool LanCheck(HttpListenerResponse res)
         {
-            lock (FtpLock)
-            {
-                string uri = BuildFtpUri(remotePath);
-                var req = (FtpWebRequest)WebRequest.Create(uri);
-                req.Method = WebRequestMethods.Ftp.DownloadFile;
-                req.KeepAlive = false;
-                req.UsePassive = true;
-                req.Timeout = 8000;
+            if (Program.LanAccess) return true;
+            Http.Error(res, 409, "O PS4 não consegue baixar do PC porque o acesso pela rede está desativado. Feche o programa, execute 'liberar-rede.bat' uma vez e abra de novo.");
+            return false;
+        }
 
+        static void PcPkgs(HttpListenerResponse res)
+        {
+            string folder = Program.Settings.pc_pkg_folder;
+            var list = new List<object>();
+            if (!string.IsNullOrEmpty(folder) && Directory.Exists(folder))
+            {
+                foreach (var f in new DirectoryInfo(folder).GetFiles("*.pkg"))
+                    list.Add(new { name = f.Name, size = f.Length, date = f.LastWriteTime.ToString("dd/MM/yyyy HH:mm") });
+            }
+            Http.Json(res, new
+            {
+                folder = folder,
+                exists = !string.IsNullOrEmpty(folder) && Directory.Exists(folder),
+                lanAccess = Program.LanAccess,
+                serverUrl = "http://" + Ps4Services.LocalIpTowardsConsole() + ":" + Program.Settings.http_port,
+                files = list
+            });
+        }
+
+        /// <summary>Serves a .pkg from the configured PC folder with HTTP Range support,
+        /// which the Remote Package Installer needs to download it.</summary>
+        public static void ServePcPkg(HttpListenerContext ctx)
+        {
+            var res = ctx.Response;
+            string folder = Program.Settings.pc_pkg_folder;
+            string name = Uri.UnescapeDataString(ctx.Request.Url.AbsolutePath.Substring("/pcpkg/".Length));
+            if (string.IsNullOrEmpty(folder) || name.IndexOfAny(new[] { '/', '\\' }) >= 0 || name.Contains("..") || !name.EndsWith(".pkg", StringComparison.OrdinalIgnoreCase))
+            {
+                res.StatusCode = 404; res.Close(); return;
+            }
+            string file = Path.Combine(folder, name);
+            if (!File.Exists(file)) { res.StatusCode = 404; res.Close(); return; }
+
+            using (var fs = new FileStream(file, FileMode.Open, FileAccess.Read, FileShare.Read, 1 << 20))
+            {
+                long len = fs.Length, start = 0, end = len - 1;
+                string range = ctx.Request.Headers["Range"];
+                res.ContentType = "application/octet-stream";
+                res.Headers["Accept-Ranges"] = "bytes";
+                if (!string.IsNullOrEmpty(range))
+                {
+                    var m = Regex.Match(range, @"bytes=(\d*)-(\d*)");
+                    if (m.Success)
+                    {
+                        if (m.Groups[1].Value.Length > 0) start = long.Parse(m.Groups[1].Value);
+                        if (m.Groups[2].Value.Length > 0) end = Math.Min(len - 1, long.Parse(m.Groups[2].Value));
+                        if (m.Groups[1].Value.Length == 0 && m.Groups[2].Value.Length > 0) { start = Math.Max(0, len - long.Parse(m.Groups[2].Value)); end = len - 1; }
+                        if (start > end || start >= len)
+                        {
+                            res.StatusCode = 416;
+                            res.Headers["Content-Range"] = "bytes */" + len;
+                            res.Close();
+                            return;
+                        }
+                        res.StatusCode = 206;
+                        res.Headers["Content-Range"] = "bytes " + start + "-" + end + "/" + len;
+                    }
+                }
+                long count = end - start + 1;
+                res.ContentLength64 = count;
+                if (ctx.Request.HttpMethod == "HEAD") { res.Close(); return; }
+                fs.Position = start;
+                byte[] buf = new byte[1 << 20];
                 try
                 {
-                    using (var res = (FtpWebResponse)req.GetResponse())
-                    using (var reader = new StreamReader(res.GetResponseStream(), Encoding.UTF8))
+                    while (count > 0)
                     {
-                        return reader.ReadToEnd();
+                        int n = fs.Read(buf, 0, (int)Math.Min(buf.Length, count));
+                        if (n <= 0) break;
+                        res.OutputStream.Write(buf, 0, n);
+                        count -= n;
                     }
+                    res.Close();
                 }
-                catch
-                {
-                    return string.Empty;
-                }
+                catch { try { res.Abort(); } catch { } }
             }
         }
-
-        public static void DownloadFtpFile(string remotePath, string localPath)
-        {
-            lock (FtpLock)
-            {
-                string uri = BuildFtpUri(remotePath);
-                var req = (FtpWebRequest)WebRequest.Create(uri);
-                req.Method = WebRequestMethods.Ftp.DownloadFile;
-                req.KeepAlive = false;
-                req.UsePassive = true;
-                req.Timeout = 15000;
-
-                using (var res = (FtpWebResponse)req.GetResponse())
-                using (var fs = new FileStream(localPath, FileMode.Create, FileAccess.Write))
-                {
-                    res.GetResponseStream().CopyTo(fs);
-                }
-            }
-        }
-
-        public static void UploadFtpText(string remotePath, string text)
-        {
-            byte[] bytes = Encoding.UTF8.GetBytes(text);
-            using (var ms = new MemoryStream(bytes))
-            {
-                StreamFtpUpload(remotePath, ms, bytes.Length);
-            }
-        }
-
-        public static void StreamFtpDownload(string remotePath, Stream destination)
-        {
-            lock (FtpLock)
-            {
-                string uri = BuildFtpUri(remotePath);
-                var req = (FtpWebRequest)WebRequest.Create(uri);
-                req.Method = WebRequestMethods.Ftp.DownloadFile;
-                req.KeepAlive = false;
-                req.UsePassive = true;
-
-                using (var res = (FtpWebResponse)req.GetResponse())
-                using (var stream = res.GetResponseStream())
-                {
-                    byte[] buffer = new byte[65536];
-                    int read;
-                    while ((read = stream.Read(buffer, 0, buffer.Length)) > 0)
-                    {
-                        destination.Write(buffer, 0, read);
-                    }
-                }
-            }
-        }
-
-        public static void StreamFtpUpload(string remotePath, Stream source, long length)
-        {
-            lock (FtpLock)
-            {
-                string uri = BuildFtpUri(remotePath);
-                var req = (FtpWebRequest)WebRequest.Create(uri);
-                req.Method = WebRequestMethods.Ftp.UploadFile;
-                req.KeepAlive = false;
-                req.UsePassive = true;
-                req.UseBinary = true;
-                if (length > 0) req.ContentLength = length;
-
-                using (var ftpStream = req.GetRequestStream())
-                {
-                    byte[] buffer = new byte[65536];
-                    int read;
-                    while ((read = source.Read(buffer, 0, buffer.Length)) > 0)
-                    {
-                        ftpStream.Write(buffer, 0, read);
-                    }
-                }
-            }
-        }
-
-        public static void ExecuteFtpCommand(string remotePath, string method)
-        {
-            lock (FtpLock)
-            {
-                string uri = BuildFtpUri(remotePath);
-                var req = (FtpWebRequest)WebRequest.Create(uri);
-                req.Method = method;
-                req.KeepAlive = false;
-                req.UsePassive = true;
-                using (var res = (FtpWebResponse)req.GetResponse()) { }
-            }
-        }
-
-        #endregion
     }
 }

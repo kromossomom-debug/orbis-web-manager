@@ -141,8 +141,8 @@
                 <div class="stat-sub" id="dash-banner">GoldHEN FTP Server v2.2</div>
               </div>
               <div class="stat-footer">
-                <span class="badge" id="dash-port-ftp">FTP: 2121 OK</span>
-                <span class="badge" id="dash-port-payload">Payload: 9090</span>
+                <span class="badge" id="dash-port-ftp">FTP: 2121</span>
+                <button class="badge badge-btn" id="dash-port-payload" data-tab-trigger="tools" title="Testar todas as portas do console">Testar portas &rarr;</button>
               </div>
             </div>
 
@@ -266,12 +266,19 @@
               <input type="text" id="games-search-input" placeholder="Buscar por título ou Title ID (ex: Diablo, CUSA00243)...">
             </div>
             <div class="toolbar-actions">
-              <button class="btn btn-outline" id="btn-refresh-games">
+              <select id="games-sort" class="select-sm" title="Ordenar">
+                <option value="played">Mais jogados</option>
+                <option value="name">Nome (A-Z)</option>
+                <option value="recent">Instalados recentemente</option>
+                <option value="starts">Mais iniciados</option>
+              </select>
+              <button class="btn btn-outline" id="btn-refresh-games" title="Clique: atualizar. Shift+Clique: atualização completa (relê nomes e capas)">
                 <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
                 <span>Recarregar</span>
               </button>
             </div>
           </div>
+          <div class="list-status" id="games-status"></div>
 
           <div class="games-grid" id="games-container">
             <!-- Dynamically injected with cover changer buttons -->
@@ -378,6 +385,23 @@
               <!-- Dynamically injected -->
             </div>
           </div>
+
+          <!-- PKGs NO PC (instalação direta via Remote Package Installer) -->
+          <div class="card p-4 mt-4">
+            <div class="pkg-header-banner">
+              <div>
+                <h2>Instalar PKG direto do PC</h2>
+                <p>O PS4 baixa o pacote direto desta pasta do computador usando o <strong>Remote Package Installer</strong> — sem copiar para o HD antes e sem ocupar espaço em dobro.</p>
+              </div>
+              <button class="btn btn-outline" id="btn-refresh-pcpkgs">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                <span>Atualizar</span>
+              </button>
+            </div>
+            <div id="pcpkgs-info" class="info-box mt-3"></div>
+            <div id="pc-rpi-progress"></div>
+            <div class="pkg-grid mt-3" id="pcpkgs-container"></div>
+          </div>
         </section>
 
         <!-- ================= TAB: MÍDIA (CAPTURAS DE TELA & PRINTS) ================= -->
@@ -433,13 +457,15 @@
                 </span>
               </div>
               <p data-i18n="tool_notify_desc">Envie uma mensagem em tempo real para pipocar no canto da tela do PlayStation 4 enquanto estiver jogando ou navegando na dashboard.</p>
-              
+
               <div class="form-group mt-3">
-                <input type="text" id="notify-msg-input" data-i18n-ph="tool_notify_ph" placeholder="Ex: Pizza chegou! / Backup concluído" value="Orbis Web Manager conectado com sucesso!">
+                <input type="text" id="notify-msg-input" maxlength="400" data-i18n-ph="tool_notify_ph" placeholder="Ex: Pizza chegou! / Backup concluído" value="Olá do Orbis Web Manager!">
               </div>
 
-              <div class="tip-box mt-3" style="font-size: 12px; background: rgba(0, 112, 209, 0.1); border-left: 3px solid var(--ps-blue); padding: 8px 12px; border-radius: 4px; color: var(--text-secondary);">
-                ℹ️ <strong>Requisito no PS4:</strong> Vá em <em>Configurações &gt; GoldHEN</em> no seu console e certifique-se de que a opção <strong>"Enable BinLoader Server"</strong> (Porta 9090) está marcada.
+              <div class="info-box mt-3">
+                <strong>Requisito no PS4: payload <code>ps4debug</code> carregado (porta 744).</strong><br>
+                O GoldHEN não tem um comando de notificação próprio na rede — a porta 9090 (BinLoader) só aceita payloads, não texto.
+                Carregue o <em>ps4debug</em> uma vez por boot: pelo menu <em>GoldHEN &gt; Payloads</em> (se a sua versão tiver) ou enviando o arquivo <code>ps4debug.bin</code> no card <strong>Injeção de Payload</strong> abaixo.
               </div>
 
               <button class="btn btn-primary mt-3" id="btn-send-notify">
@@ -457,7 +483,8 @@
                 </span>
               </div>
               <p data-i18n="tool_rpi_desc">Mande o PS4 instalar pacotes (.pkg) direto via rede HTTP (Porta 12800) em segundo plano, sem ocupar o dobro de espaço no HD.</p>
-              
+              <p class="text-muted text-sm mt-2">Requer o app <strong>Remote Package Installer</strong> (flatz) aberto no PS4. Para instalar arquivos do seu PC, use a aba <a href="#" data-tab-trigger="pkgs" class="link">Pacotes (PKG)</a>.</p>
+
               <div class="form-group mt-3">
                 <input type="url" id="rpi-pkg-url" placeholder="http://192.168.18.x:8080/jogo.pkg">
               </div>
@@ -465,6 +492,23 @@
               <button class="btn btn-outline mt-3" id="btn-trigger-rpi">
                 <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
                 <span data-i18n="tool_rpi_btn">Disparar Instalação no PS4 (RPI)</span>
+              </button>
+              <div id="rpi-progress" class="mt-3"></div>
+            </div>
+
+            <!-- PORT DIAGNOSTICS -->
+            <div class="card p-4 glow-purple" id="card-ports">
+              <div class="stat-header">
+                <h3>Diagnóstico de Portas</h3>
+                <span class="stat-icon purple">
+                  <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+                </span>
+              </div>
+              <p>Verifica quais serviços do console estão respondendo agora. Se algo não funciona, comece por aqui.</p>
+              <div id="ports-result" class="ports-list mt-3"></div>
+              <button class="btn btn-outline mt-3" id="btn-test-ports">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                <span>Testar Portas</span>
               </button>
             </div>
 
@@ -493,6 +537,9 @@
                 <div class="network-badge">
                   <span class="label" data-i18n="tool_phone_addr">Endereço de Acesso Móvel:</span>
                   <code id="mobile-url-display">http://...:5000</code>
+                </div>
+                <div class="warn-box lan-warning" style="display:none;">
+                  O acesso pela rede está desativado. Feche o programa, execute <code>liberar-rede.bat</code> uma vez (pede administrador) e abra de novo.
                 </div>
                 <div id="qr-container" class="qr-box">
                   <!-- QR Code rendered via JS or SVG -->
@@ -540,13 +587,20 @@
 
               <div class="form-group mt-3">
                 <label data-i18n="settings_sgdb_key">Chave de API do SteamGridDB (Opcional)</label>
-                <input type="password" id="cfg-sgdb-key" placeholder="Insira sua chave para liberar pôsteres e capas da comunidade">
+                <input type="password" id="cfg-sgdb-key" autocomplete="off" placeholder="Insira sua chave para liberar pôsteres e capas da comunidade">
                 <small class="text-muted" style="display: block; margin-top: 4px;">
+                  <span id="sgdb-key-state"></span>
                   Permite buscar e baixar milhares de capas da comunidade. 
                   <a href="https://www.steamgriddb.com/profile/preferences/api" target="_blank" rel="noopener" style="color: var(--neon-cyan); text-decoration: underline;">
                     Pegar chave gratuita no SteamGridDB
                   </a>
                 </small>
+              </div>
+
+              <div class="form-group mt-3">
+                <label>Pasta de PKGs no PC (para instalar pela rede)</label>
+                <input type="text" id="cfg-pc-pkg-folder" placeholder="ex: D:\PS4\PKGs">
+                <small class="text-muted" style="display: block; margin-top: 4px;">Os .pkg desta pasta aparecem na aba Pacotes e podem ser instalados no PS4 sem copiar antes.</small>
               </div>
 
               <button type="submit" class="btn btn-primary mt-4">
@@ -768,20 +822,59 @@
     </div>
   </div>
 
+  <!-- MODAL: DETALHES DO JOGO -->
+  <div class="modal-overlay" id="modal-game">
+    <div class="modal-card large">
+      <div class="modal-header">
+        <div class="game-detail-head">
+          <img id="gd-icon" src="" alt="">
+          <div>
+            <h3 id="gd-title">Jogo</h3>
+            <p class="text-muted text-sm" id="gd-sub"></p>
+          </div>
+        </div>
+        <button class="modal-close" onclick="closeModal('modal-game')">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="gd-stats" id="gd-stats"></div>
+        <div class="gd-actions mt-3">
+          <button class="btn btn-primary btn-sm" id="gd-btn-cover">Trocar Capa</button>
+          <button class="btn btn-outline btn-sm" id="gd-btn-bg">Trocar Fundo (pic1)</button>
+          <button class="btn btn-outline btn-sm" id="gd-btn-restore" style="display:none;">Restaurar Capa Original</button>
+          <a class="btn btn-outline btn-sm" id="gd-btn-download" href="#" download>Baixar Capa Atual</a>
+          <button class="btn btn-outline btn-sm" id="gd-btn-files">Abrir Pasta no FTP</button>
+        </div>
+        <div id="gd-cheats" class="mt-3"></div>
+      </div>
+    </div>
+  </div>
+
   <!-- MODAL: BUSCAR CAPAS ONLINE (SONY TMDB & STEAMGRIDDB) -->
   <div class="modal-overlay" id="modal-cover-search">
     <div class="modal-card large">
       <div class="modal-header">
         <div>
           <h3 id="modal-cover-title">Buscar Capas Online</h3>
-          <p class="text-muted text-sm" id="modal-cover-sub">Baixe artes oficiais da Sony TMDB ou capas do SteamGridDB</p>
+          <p class="text-muted text-sm" id="modal-cover-sub">Baixe artes oficiais da Sony ou da comunidade SteamGridDB</p>
         </div>
         <button class="modal-close" onclick="closeModal('modal-cover-search')">&times;</button>
       </div>
       <div class="modal-body" style="max-height: 70vh; overflow-y: auto;">
+        <!-- Target + fit -->
+        <div class="cover-options">
+          <div class="seg" id="cover-target-seg">
+            <button class="seg-btn active" data-value="icon">Capa (ícone 512×512)</button>
+            <button class="seg-btn" data-value="background">Fundo (pic1 1920×1080)</button>
+          </div>
+          <div class="seg" id="cover-fit-seg">
+            <button class="seg-btn active" data-value="cover" title="Preenche e corta as bordas">Preencher</button>
+            <button class="seg-btn" data-value="contain" title="Mostra a imagem inteira com fundo desfocado">Imagem inteira</button>
+          </div>
+        </div>
+
         <!-- Search Toolbar -->
-        <div class="form-row mb-3" style="gap: 10px;">
-          <input type="text" id="cover-search-input" placeholder="Nome do jogo ou CUSA..." style="flex: 1;">
+        <div class="form-row mt-3 mb-3" style="gap: 10px;">
+          <input type="text" id="cover-search-input" class="input" placeholder="Nome do jogo..." style="flex: 1;">
           <button class="btn btn-primary" id="btn-cover-search-exec">
             <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
             <span>Buscar</span>
@@ -798,48 +891,61 @@
         <div id="cover-search-results">
           <!-- Sony TMDB section -->
           <div id="sony-cover-section" class="mb-4" style="display: none;">
-            <h4 class="mb-2" style="font-size: 14px; color: var(--neon-cyan); display: flex; align-items: center; gap: 6px;">
-              <span>🎮 Capa Oficial PlayStation Store (Sony TMDB)</span>
-            </h4>
-            <div class="card p-3" style="display: flex; gap: 16px; align-items: center; background: rgba(0, 229, 255, 0.05); border-color: rgba(0, 229, 255, 0.2);">
-              <img id="sony-cover-preview" src="" alt="Capa Oficial Sony" style="width: 80px; height: 80px; border-radius: 8px; object-fit: cover;">
-              <div style="flex: 1;">
-                <strong style="display: block;">Ícone Original 512x512</strong>
-                <span class="text-muted text-sm">Resolução nativa oficial da PlayStation Network</span>
-              </div>
-              <button class="btn btn-primary btn-sm" id="btn-apply-sony-cover">
-                Aplicar Oficial
-              </button>
-            </div>
+            <h4 class="section-mini-title" style="color: var(--neon-cyan);">Arte Oficial PlayStation (Sony)</h4>
+            <div class="sony-row" id="sony-cover-row"></div>
           </div>
 
           <!-- SteamGridDB section -->
           <div id="sgdb-cover-section">
-            <h4 class="mb-2" style="font-size: 14px; color: var(--neon-purple); display: flex; align-items: center; justify-content: space-between;">
-              <span>🎨 Artes & Pôsteres da Comunidade (SteamGridDB)</span>
+            <h4 class="section-mini-title" style="color: #b57cff; justify-content: space-between;">
+              <span>Artes da Comunidade (SteamGridDB)</span>
               <span class="badge" id="sgdb-count-badge">0 encontradas</span>
             </h4>
 
-            <div id="sgdb-no-key-banner" class="card p-3 mb-3 text-center" style="display: none; background: rgba(168, 85, 247, 0.08); border-color: rgba(168, 85, 247, 0.25);">
-              <p class="text-sm">Para liberar milhares de capas estilizadas da comunidade SteamGridDB, configure sua chave gratuita nas Configurações.</p>
-              <a href="https://www.steamgriddb.com/profile/preferences/api" target="_blank" rel="noopener" class="btn btn-outline btn-sm mt-2" style="display: inline-flex; align-items: center; gap: 6px;">
-                <span>Obter Chave Gratuita no SteamGridDB</span>
-                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6m4-3h6v6m-11 5L21 3"/></svg>
-              </a>
+            <div id="sgdb-no-key-banner" class="info-box mb-3" style="display: none;">
+              Para liberar milhares de capas da comunidade, crie uma chave gratuita no SteamGridDB e cole em <strong>Configurações</strong>.
+              <a href="https://www.steamgriddb.com/profile/preferences/api" target="_blank" rel="noopener" class="link">Obter chave gratuita</a>
             </div>
 
-            <div id="sgdb-grid-container" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 12px;">
-              <!-- Rendered dynamically -->
+            <div class="form-row mb-3" id="sgdb-filters" style="gap: 10px; display: none;">
+              <select id="sgdb-game-select" class="select-sm" style="flex: 2;" title="Jogo encontrado no SteamGridDB"></select>
+              <select id="sgdb-kind-select" class="select-sm" style="flex: 1;" title="Tipo de arte">
+                <option value="square">Quadradas (melhor p/ capa)</option>
+                <option value="all">Todas as grades</option>
+                <option value="heroes">Banners (melhor p/ fundo)</option>
+              </select>
             </div>
+
+            <div id="sgdb-grid-container" class="sgdb-grid"></div>
           </div>
         </div>
       </div>
-      <div class="modal-footer" style="padding: 14px 24px; display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--border-subtle);">
+      <div class="modal-footer">
         <button class="btn btn-outline btn-sm" onclick="triggerLocalFileUpload()">
           <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4m17-5l-5-5m0 0l-5 5m5-5v12"/></svg>
-          <span>Upload do PC</span>
+          <span>Enviar imagem do PC</span>
         </button>
+        <span class="text-muted text-sm hide-mobile">O PS4 pode só mostrar a capa nova depois de reiniciar o console.</span>
         <button class="btn btn-outline btn-sm" onclick="closeModal('modal-cover-search')">Fechar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: PRÉ-VISUALIZAÇÃO DA CAPA -->
+  <div class="modal-overlay" id="modal-cover-preview">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>Confirmar nova arte</h3>
+        <button class="modal-close" onclick="closeModal('modal-cover-preview')">&times;</button>
+      </div>
+      <div class="modal-body text-center">
+        <p class="text-muted text-sm mb-3" id="cover-preview-desc">Assim ficará no PS4:</p>
+        <div class="cover-preview-box"><img id="cover-preview-img" src="" alt="Pré-visualização"></div>
+        <p class="text-muted text-sm mt-3">A arte original é guardada no PC e pode ser restaurada a qualquer momento.</p>
+        <div class="form-row mt-3" style="gap: 10px; justify-content: center;">
+          <button class="btn btn-outline" onclick="closeModal('modal-cover-preview')">Cancelar</button>
+          <button class="btn btn-primary" id="btn-cover-confirm">Aplicar no PS4</button>
+        </div>
       </div>
     </div>
   </div>
