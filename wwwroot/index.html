@@ -77,6 +77,10 @@
         </button>
 
         <div class="nav-group-label">Console</div>
+        <button class="nav-item" data-tab="downloads">
+          <svg><use href="#i-download"/></svg><span data-i18n="nav_downloads">Downloads</span>
+          <span class="nav-badge" id="downloads-count-badge" hidden>0</span>
+        </button>
         <button class="nav-item" data-tab="files">
           <svg><use href="#i-folder"/></svg><span data-i18n="nav_files">Arquivos (FTP)</span>
         </button>
@@ -376,6 +380,26 @@
             <div id="pcpkgs-info" class="info-box"></div>
             <div id="pc-rpi-progress"></div>
             <div class="pkg-grid mt-3" id="pcpkgs-container"></div>
+          </div>
+        </section>
+
+        <!-- ============ DOWNLOADS ============ -->
+        <section class="tab-pane" id="pane-downloads">
+          <div class="card p-4">
+            <div class="pkg-header-banner">
+              <div>
+                <h2>Baixando no PS4</h2>
+                <p>Jogos, atualizações e DLCs da PSN, e pacotes enviados pelo Remote Package Installer. A lista se atualiza sozinha enquanto esta tela está aberta.</p>
+              </div>
+              <button class="btn btn-outline" id="btn-refresh-downloads"><svg><use href="#i-refresh"/></svg><span>Atualizar</span></button>
+            </div>
+            <div class="dl-list" id="downloads-container" aria-live="polite"></div>
+            <p class="dl-updated" id="downloads-updated"></p>
+          </div>
+
+          <div class="card p-4 mt-4" id="downloads-finished-card" hidden>
+            <div class="pkg-header-banner"><div><h2>Concluídos agora há pouco</h2><p>O console passa a instalar o conteúdo logo depois do download.</p></div></div>
+            <div class="dl-list" id="downloads-finished"></div>
           </div>
         </section>
 

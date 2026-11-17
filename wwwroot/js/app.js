@@ -26,6 +26,9 @@ const translations = {
     nav_files: "Arquivos (FTP)",
     nav_cheats: "Cheats & Mods",
     nav_pkgs: "Pacotes (PKG)",
+    nav_downloads: "Downloads",
+    title_downloads: "Downloads",
+    sub_downloads: "Progresso dos downloads do console, ao vivo",
     nav_media: "Capturas & Prints",
     nav_tools: "Payloads & Ações",
     nav_settings: "Configurações",
@@ -148,6 +151,9 @@ const translations = {
     sub_cheats: "GoldHEN Cheats Manager",
     title_pkgs: "PKG Packages",
     sub_pkgs: "Installation and management of .pkg files",
+    nav_downloads: "Downloads",
+    title_downloads: "Downloads",
+    sub_downloads: "Live progress of the console's downloads",
     title_media: "Screenshots & Media",
     sub_media: "Direct screenshots captured with the Share button",
     title_tools: "Payloads & Actions",
@@ -321,6 +327,14 @@ document.addEventListener('DOMContentLoaded', () => {
   // Light polling, only while the tab is visible
   setInterval(() => { if (document.visibilityState === 'visible') fetchStatus(); }, 8000);
   setInterval(() => { if (document.visibilityState === 'visible') fetchSummary(); }, 30000);
+  // Downloads: every 5 s on its screen, every 30 s elsewhere (keeps the badge and "finished" toasts alive)
+  setTimeout(() => loadDownloads(true), 4000);
+  setInterval(() => {
+    if (document.visibilityState !== 'visible') return;
+    const onTab = state.currentTab === 'downloads';
+    if (onTab || Date.now() - dl.lastAt > 30000) loadDownloads(!onTab);
+  }, 5000);
+  document.getElementById('btn-refresh-downloads').addEventListener('click', () => loadDownloads());
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') fetchStatus(); });
 
   if (!localStorage.getItem('owm_tour_completed')) {
@@ -472,6 +486,7 @@ function updateTabTitles(tabId) {
     files: { title: d.title_files, sub: d.sub_files },
     cheats: { title: d.title_cheats, sub: d.sub_cheats },
     pkgs: { title: d.title_pkgs, sub: d.sub_pkgs },
+    downloads: { title: d.title_downloads, sub: d.sub_downloads },
     media: { title: d.title_media, sub: d.sub_media },
     tools: { title: d.title_tools, sub: d.sub_tools },
     settings: { title: d.title_settings, sub: d.sub_settings },
@@ -502,6 +517,7 @@ function switchTab(tabId) {
   if (tabId === 'media') loadCaptures(state.selectedCaptureGame);
   if (tabId === 'settings') loadConfig();
   if (tabId === 'tools') checkBinLoader();
+  if (tabId === 'downloads') loadDownloads();
 }
 
 // ================= DELEGATED ACTIONS (dynamic lists) =================
@@ -1691,6 +1707,97 @@ function formatBytes(bytes, decimals = 1) {
   const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
   const i = Math.min(sizes.length - 1, Math.floor(Math.log(bytes) / Math.log(k)));
   return `${parseFloat((bytes / Math.pow(k, i)).toFixed(decimals))} ${sizes[i]}`;
+}
+
+// ================= CONSOLE DOWNLOADS (PSN / RPI) =================
+const dl = { busy: false, lastAt: 0, known: null, loadedOnce: false };
+
+function fmtEta(sec) {
+  if (sec === undefined || sec < 0) return '';
+  if (sec < 60) return 'menos de 1 min';
+  const h = Math.floor(sec / 3600), m = Math.round((sec % 3600) / 60);
+  return h > 0 ? `${h} h ${m} min` : `${m} min`;
+}
+
+function downloadCard(t) {
+  const icon = `/api/downloads/icon?task=${encodeURIComponent(t.taskId)}&id=${encodeURIComponent(t.titleId || '')}`;
+  const pct = Math.max(0, Math.min(100, t.percent || 0));
+  let stateBadge, detail;
+  if (t.state === 'finished') {
+    stateBadge = '<span class="badge success">Download concluído</span>';
+    detail = `${formatBytes(t.total)}`;
+  } else if (t.state === 'unknown') {
+    stateBadge = '<span class="badge outline">Último valor lido</span>';
+    detail = `${formatBytes(t.downloaded)} de ${formatBytes(t.total)}`;
+  } else if (t.state === 'paused') {
+    stateBadge = '<span class="badge warning">Pausado ou na fila</span>';
+    detail = `${formatBytes(t.downloaded)} de ${formatBytes(t.total)}`;
+  } else {
+    stateBadge = '<span class="badge cheat">Baixando</span>';
+    const speed = t.speed > 0 ? ` · ${formatBytes(t.speed)}/s` : ' · medindo velocidade…';
+    detail = `${formatBytes(t.downloaded)} de ${formatBytes(t.total)}${speed}`;
+  }
+  const eta = t.state === 'downloading' && t.etaSec >= 0 ? `faltam ${fmtEta(t.etaSec)}` : '';
+  const meta = [t.kind, t.titleId, t.version ? 'v' + t.version : ''].filter(Boolean).map(esc).join(' · ');
+  return `
+    <article class="dl-item ${esc(t.state)}">
+      <img class="dl-icon" src="${icon}" alt="" data-icon loading="lazy">
+      <div class="dl-body">
+        <div class="dl-top">
+          <div class="dl-title"><strong>${esc(t.name)}</strong><span>${meta}</span></div>
+          <div class="dl-pct" aria-hidden="true">${t.state === 'finished' ? '100' : pct.toFixed(1)}<small>%</small></div>
+        </div>
+        <div class="progress-bar-wrap" role="progressbar" aria-label="Progresso de ${esc(t.name)}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${t.state === 'finished' ? 100 : pct}">
+          <div class="progress-bar" style="width:${t.state === 'finished' ? 100 : pct}%"></div>
+        </div>
+        <div class="dl-foot">${stateBadge}<span>${detail}</span><span class="dl-eta">${esc(eta)}</span></div>
+      </div>
+    </article>`;
+}
+
+async function loadDownloads(silent) {
+  if (dl.busy) return;
+  dl.busy = true;
+  const box = document.getElementById('downloads-container');
+  if (!silent && !dl.loadedOnce) box.innerHTML = '<div class="loading-state"><div class="spinner"></div><span>Lendo a fila de downloads do PS4… (a primeira vez pode levar até 1 minuto)</span></div>';
+  try {
+    const r = await api('/api/downloads', { timeout: 150000 });
+    dl.lastAt = Date.now();
+    dl.loadedOnce = true;
+    const tasks = r.tasks || [], done = r.finished || [];
+
+    // Toast when something we saw downloading has finished
+    const ids = new Set(tasks.map(t => t.taskId));
+    if (dl.known) {
+      done.forEach(f => { if (dl.known.has(f.taskId) && !ids.has(f.taskId)) showToast(`Download concluído: ${f.name}`, 'success', 6000); });
+    }
+    dl.known = ids;
+
+    const badge = document.getElementById('downloads-count-badge');
+    const moving = tasks.filter(t => t.state === 'downloading').length;
+    badge.textContent = tasks.length;
+    badge.hidden = tasks.length === 0;
+    badge.classList.toggle('live', moving > 0);
+
+    if (!r.ok && tasks.length) {
+      box.innerHTML = `<div class="info-box warn-box"><strong>${esc(r.error || 'O PS4 não respondeu.')}</strong> Ele pode estar em modo de repouso: o download continua, mas o FTP do GoldHEN só volta quando o console é ligado. Mostrando o último progresso lido${r.updated ? ' às ' + esc(r.updated) : ''}.</div>`
+        + tasks.map(t => downloadCard({ ...t, state: 'unknown' })).join('');
+    } else if (!r.ok) {
+      box.innerHTML = `<div class="empty-state"><svg><use href="#i-alert"/></svg><strong>Não deu para ler os downloads</strong><span>${esc(r.error || '')}. Se o PS4 estiver em modo de repouso, os downloads continuam, mas só aparecem aqui quando ele for ligado.</span></div>`;
+    } else if (!tasks.length) {
+      box.innerHTML = '<div class="empty-state"><svg><use href="#i-download"/></svg><strong>Nenhum download em andamento</strong><span>Quando o PS4 começar a baixar um jogo, atualização ou DLC, o progresso aparece aqui.</span></div>';
+    } else {
+      box.innerHTML = tasks.map(downloadCard).join('');
+    }
+    document.getElementById('downloads-updated').textContent = r.updated ? `Atualizado às ${r.updated}` : '';
+    const fc = document.getElementById('downloads-finished-card');
+    fc.hidden = done.length === 0;
+    document.getElementById('downloads-finished').innerHTML = done.map(downloadCard).join('');
+  } catch (e) {
+    if (!silent) box.innerHTML = `<div class="empty-state"><svg><use href="#i-alert"/></svg><strong>Não deu para ler os downloads</strong><span>${esc(e.message)}</span></div>`;
+  } finally {
+    dl.busy = false;
+  }
 }
 
 // ================= INTERACTIVE TUTORIAL TOUR =================

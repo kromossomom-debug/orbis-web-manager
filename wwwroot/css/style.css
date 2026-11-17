@@ -974,3 +974,31 @@ svg { flex-shrink: 0; }
 .port-status.open .status-dot { background: var(--success); box-shadow: 0 0 0 4px var(--success-soft); }
 .port-status.closed .status-dot { background: var(--danger); box-shadow: 0 0 0 4px var(--danger-soft); }
 .port-status.closed { color: var(--text); }
+
+/* ---------- Console downloads ---------- */
+.dl-list { display: flex; flex-direction: column; gap: var(--s3); }
+.dl-item {
+  display: flex; gap: var(--s4); align-items: center;
+  padding: var(--s4); background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--r-lg);
+}
+.dl-icon { width: 72px; height: 72px; border-radius: var(--r-md); object-fit: cover; flex-shrink: 0; background: var(--surface-3); }
+.dl-body { flex: 1; min-width: 0; }
+.dl-top { display: flex; justify-content: space-between; align-items: flex-start; gap: var(--s3); }
+.dl-title { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.dl-title strong { font-size: var(--fs-md); color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dl-title span { font-size: var(--fs-xs); color: var(--text-3); }
+.dl-pct { font-family: var(--mono); font-size: 28px; font-weight: 500; color: var(--text); line-height: 1; font-variant-numeric: tabular-nums; }
+.dl-pct small { font-size: 14px; color: var(--text-3); margin-left: 2px; }
+.dl-item .progress-bar-wrap { height: 8px; margin-top: var(--s3); }
+.dl-item.paused .progress-bar { background: var(--warning); }
+.dl-item.finished .progress-bar { background: var(--success); }
+.dl-foot { display: flex; align-items: center; gap: var(--s3); flex-wrap: wrap; margin-top: var(--s3); font-size: var(--fs-sm); color: var(--text-2); font-variant-numeric: tabular-nums; }
+.dl-eta { margin-left: auto; color: var(--text-3); }
+.dl-updated { margin-top: var(--s3); font-size: var(--fs-xs); color: var(--text-3); }
+.nav-badge.live { background: var(--accent); color: #fff; }
+@media (max-width: 768px) {
+  .dl-item { padding: var(--s3); gap: var(--s3); align-items: flex-start; }
+  .dl-icon { width: 56px; height: 56px; }
+  .dl-pct { font-size: 22px; }
+  .dl-eta { margin-left: 0; width: 100%; }
+}

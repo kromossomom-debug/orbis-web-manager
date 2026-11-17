@@ -525,6 +525,24 @@ namespace OrbisWebManager
                     }
                 case "/api/pc/pkgs": PcPkgs(res); return;
 
+                // ------------------------------------------------ console downloads (PSN / RPI)
+                case "/api/downloads": Http.Json(res, Downloads.Get()); return;
+                case "/api/downloads/icon":
+                    {
+                        string task = q["task"] ?? "";
+                        byte[] png = Downloads.IsTaskId(task) ? Downloads.Icon(task) : null;
+                        if (png == null)
+                        {
+                            string id = Covers.SafeId(q["id"]);
+                            res.Redirect("/api/game/icon?id=" + Uri.EscapeDataString(id));
+                            res.Close();
+                            return;
+                        }
+                        res.AddHeader("Cache-Control", "max-age=3600");
+                        Http.Bytes(res, png, "image/png");
+                        return;
+                    }
+
                 // ------------------------------------------------ console services
                 case "/api/payload":
                     if (!post) break;

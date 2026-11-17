@@ -80,6 +80,10 @@ Ele se conecta diretamente ao seu **PlayStation 4** através da rede local (Wi-F
 * Com o app **Remote Package Installer** (flatz) aberto no PS4 (porta `12800`), instale PKGs pela rede **direto de uma pasta do seu PC**, sem copiar para o HD antes e sem ocupar espaço em dobro. Mostra o progresso da instalação.
 * Também aceita uma URL http de um `.pkg` em qualquer servidor da rede.
 
+### 10.0 ⬇️ Monitor de Downloads do Console
+* Acompanhe pelo PC ou celular o **% de download** de jogos, atualizações e DLCs da PSN (e dos pacotes enviados pelo RPI), com tamanho baixado, velocidade e tempo restante. Funciona só com o FTP: o Orbis lê a fila de transferências do próprio PS4 (`/user/bgft/task/`), sem payload extra.
+* Avisa quando um download termina. Em modo de repouso o PS4 continua baixando, mas o FTP do GoldHEN não responde; a tela mostra o último progresso lido.
+
 ### 10.1 🩺 Diagnóstico de Portas
 * Testa de uma vez FTP (2121), BinLoader (9090), ps4debug (744) e Remote Package Installer (12800) e mostra o que está aberto.
 
