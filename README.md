@@ -132,7 +132,7 @@ O aplicativo conta com suporte bilíngue nativo com troca instantânea no cabeç
    * **No Computador:** `http://localhost:5000`
    * **No Celular / Tablet:** `http://<IP_DO_SEU_PC>:5000` (ou escaneie o QR Code na tela).
 4. Na aba **Configurações**, informe o IP do seu PlayStation 4 (ex: `192.168.1.100`) e clique em Salvar!
-5. *(Opcional, uma vez só)* Para acessar pelo celular e para o PS4 conseguir baixar PKGs do seu PC, execute `liberar-rede.bat` (ele pede permissão de administrador, reserva a porta e libera no Firewall apenas para redes privadas).
+5. *(Opcional, uma vez só)* Para acessar pelo celular e para o PS4 conseguir baixar PKGs do seu PC, execute `liberar-rede.bat` (ele pede permissão de administrador, reserva a porta e libera no Firewall só para aparelhos da sua rede local, mesmo que o Windows marque o Wi-Fi como "Rede pública").
 
 ## 🐢 Está lento? Leia isto
 * O servidor FTP do GoldHEN é simples e sensível à rede. O Orbis Web Manager agora mantém **uma única conexão aberta e reaproveitada**, guarda nomes, tempo de jogo e capas em cache no PC e atualiza tudo em segundo plano. Depois do primeiro carregamento, a biblioteca abre na hora.

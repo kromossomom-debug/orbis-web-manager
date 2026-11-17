@@ -24,11 +24,13 @@ netsh http delete urlacl url=http://+:%PORT%/ >nul 2>&1
 rem SDDL "WD" = Everyone (funciona em Windows de qualquer idioma)
 netsh http add urlacl url=http://+:%PORT%/ sddl=D:(A;;GX;;;WD)
 
-echo [2/2] Liberando a porta %PORT% no Firewall do Windows (apenas redes privadas)...
+echo [2/2] Liberando a porta %PORT% no Firewall do Windows (somente aparelhos da sua rede local)...
 netsh advfirewall firewall delete rule name="Orbis Web Manager" >nul 2>&1
-netsh advfirewall firewall add rule name="Orbis Web Manager" dir=in action=allow protocol=TCP localport=%PORT% profile=private
+rem Vale para rede Privada e Publica (o Windows costuma marcar o Wi-Fi de casa como Publica),
+rem mas so aceita conexoes vindas da mesma sub-rede (remoteip=localsubnet).
+netsh advfirewall firewall add rule name="Orbis Web Manager" dir=in action=allow protocol=TCP localport=%PORT% profile=private,public remoteip=localsubnet
 
 echo.
-echo Pronto! Feche e abra o Orbis Web Manager de novo (start.bat).
-echo Obs: a sua rede Wi-Fi/cabo precisa estar como "Rede privada" no Windows.
+echo Pronto! Agora abra no celular (mesmo Wi-Fi) o endereco mostrado no Orbis
+echo (botao "Abrir no celular"). Se o Orbis ja estava aberto, nao precisa reiniciar.
 pause
