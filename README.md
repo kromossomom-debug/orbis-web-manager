@@ -9,6 +9,18 @@ O **Orbis Web Manager** é uma central de comando e gerenciamento completa que r
 
 Ele se conecta diretamente ao seu **PlayStation 4** através da rede local (Wi-Fi ou cabo), permitindo controlar o console, visualizar biblioteca de jogos, tempo jogado, gerenciar arquivos, instalar pacotes PKG, adicionar e converter cheats do GoldHEN, e injetar payloads com total facilidade e sem precisar de pendrive.
 
+## 📸 Capturas de tela
+
+![Dashboard: status do console, serviços e jogos mais jogados](docs/screenshots/dashboard.jpg)
+
+| Biblioteca de jogos | Detalhes do jogo |
+|---|---|
+| ![Biblioteca com capas, versão e tempo jogado](docs/screenshots/library.jpg) | ![Detalhes do jogo: tempo jogado, versão, tamanhos e cheats](docs/screenshots/game-details.jpg) |
+| **Trocar capa (Sony / SteamGridDB)** | **Pacotes PKG** |
+| ![Busca de capas oficiais e da comunidade](docs/screenshots/cover-search.jpg) | ![PKGs no console e instalação pela rede](docs/screenshots/pkgs.jpg) |
+
+<p align="center"><img src="docs/screenshots/mobile-dashboard.jpg" alt="Versão para celular" width="300"></p>
+
 ---
 
 ## ✨ Principais Recursos
