@@ -97,6 +97,51 @@ Ele se conecta diretamente ao seu **PlayStation 4** através da rede local (Wi-F
 ### 13. 💉 Injeção de Payloads
 * Envie arquivos `.bin` diretamente para a porta `9090` do GoldHEN sem precisar de programas externos.
 
+## 🆕 Novidades da v2.2
+
+### 💾 Backup de saves
+* Copia os saves de um jogo (ou de todos) para o PC, em `backups/saves/`, com histórico por data. Restaurar funciona no **mesmo console e mesmo usuário**; antes de restaurar, o Orbis guarda automaticamente o save atual. Também baixa qualquer backup em `.zip`.
+
+### 🔄 Atualizações dos jogos
+* Compara a versão instalada de cada jogo com a mais recente da PSN e mostra quais têm atualização (com o tamanho). Os jogos aparecem com o selo **UPDATE** na biblioteca.
+
+### ⏯️ Controle dos downloads
+* Pausar, retomar e cancelar downloads pela tela Downloads (usa o Remote Package Installer aberto no PS4).
+
+### 🧹 Limpeza de PKGs
+* Lê o cabeçalho de cada `.pkg` em `/data/pkg/` e mostra quais já estão instalados, para apagar e liberar espaço com um clique. Os PKGs da pasta do PC aparecem com ícone, nome, versão e se vão instalar, atualizar ou se já estão no console.
+
+### 🧩 GoldHEN fácil
+* **Configurações:** o `config.ini` do GoldHEN vira chaves liga/desliga (FTP, BinLoader, cheats, plugins…). Uma cópia do arquivo antigo fica no PC.
+* **Plugins:** liga e desliga os plugins de `/data/GoldHEN/plugins/` para todos os jogos ou só para um.
+* **Patches de jogo:** baixa a lista do [repositório oficial de patches](https://github.com/GoldHEN/GoldHEN_Patch_Repository) (60 FPS, resolução, correções) e mostra só os dos seus jogos, com instalação em um clique.
+* **Cheats online:** cheats do [repositório oficial do GoldHEN](https://github.com/GoldHEN/GoldHEN_Cheat_Repository) para os seus jogos, destacando os da versão instalada.
+
+### 📈 Estatísticas
+* **Tempo de jogo por dia:** gráfico dos últimos 7 a 90 dias. Como o GoldHEN só guarda o total de cada jogo, o Orbis anota esse total todo dia em que fica aberto.
+* **Espaço por jogo:** quanto ocupam o jogo base, as atualizações e as DLCs de cada título.
+* **Troféus:** progresso de troféus por jogo, lido do próprio console.
+* **Jogando agora:** o Dashboard mostra o jogo aberto e há quanto tempo (precisa do ps4debug carregado).
+
+### 🎮 Mais na tela do jogo
+* Lista de DLCs instaladas, aviso de atualização e botões para desinstalar o jogo ou só a atualização (via Remote Package Installer).
+
+### ⏰ Limite de tempo de jogo
+* Avisa na TV depois de X minutos jogando ou a partir de um horário (ex.: 22:00). Precisa do ps4debug e do Orbis aberto no PC.
+
+### 🔐 PIN de acesso pela rede
+* Opcional: celulares e outros aparelhos pedem um PIN (lembrado por 30 dias). No próprio PC nunca é pedido.
+
+### ⚡ E também
+* **Busca global (Ctrl+K ou /):** encontra jogo, tela ou ação.
+* **Capas em lote:** troca a capa de vários jogos de uma vez com a arte oficial ou do SteamGridDB.
+* **Capturas em .zip:** selecione várias prints e baixe tudo de uma vez.
+* **Exportar biblioteca:** planilha `.csv` com tempo de jogo, versão, tamanho e atualizações.
+* **Atividade recente:** o Dashboard registra o que foi feito pelo Orbis (capa trocada, PKG enviado, save restaurado…).
+* **Envio que continua de onde parou:** se o Wi-Fi cair no meio de um arquivo grande, o envio retoma do ponto em que parou.
+* **App no celular:** no celular, use "Adicionar à tela inicial" para abrir o Orbis como um app.
+* **Aviso de nova versão** do Orbis no Dashboard.
+
 ---
 
 ## ☕ Apoie o Projeto
@@ -124,7 +169,8 @@ O aplicativo conta com suporte bilíngue nativo com troca instantânea no cabeç
 ## 🚀 Como Iniciar
 
 1. Certifique-se de que o PlayStation 4 está ligado com o GoldHEN ativo na mesma rede local.
-2. Dê dois cliques no arquivo:
+   * **Jeito mais fácil:** baixe o `.zip` da versão mais recente em [Releases](https://github.com/kromossomom-debug/orbis-web-manager/releases), extraia e abra `OrbisManager.exe`. Não precisa compilar.
+2. Ou, a partir do código-fonte, dê dois cliques no arquivo:
    ```cmd
    start.bat
    ```
@@ -143,7 +189,7 @@ O aplicativo conta com suporte bilíngue nativo com troca instantânea no cabeç
 ## 🛠️ Arquitetura & Tecnologia
 * **Zero Dependências Externas:** Não requer Node.js, Python, npm ou pip instalados. Compilado nativamente com o compilador C# (`csc.exe`) do próprio Windows.
 * **Alta Performance:** Servidor multi-thread baseado em `HttpListener`, cliente FTP próprio com conexão persistente e fila com prioridade (o que você clica passa na frente da atualização em segundo plano), cache em disco (`cache/titles.json`, `stats.json`, `games.json`, `icons/`).
-* **Código-fonte:** `src/Program.cs` (servidor e rotas), `src/Ftp.cs` (cliente FTP), `src/Library.cs` (biblioteca e cache), `src/Covers.cs` (capas, PNG/DDS), `src/Ps4Services.cs` (notificação, payload, RPI, portas). O `start.bat` recompila automaticamente.
+* **Código-fonte:** `src/Program.cs` (servidor e rotas), `src/Features.cs` (rotas da v2.2, PIN, capas em lote), `src/Ftp.cs` (cliente FTP), `src/Library.cs` (biblioteca e cache), `src/Covers.cs` (capas, PNG/DDS), `src/Ps4Services.cs` (notificação, payload, RPI, portas), `src/Downloads.cs` (fila de downloads), `src/Saves.cs` (backup de saves), `src/GoldHen.cs` (config, plugins, patches, cheats online), `src/Stats.cs` (histórico, espaço, atualizações, jogando agora), `src/Pkg.cs` (leitor de PKG), `src/Sqlite.cs` (leitor SQLite para os bancos do PS4). O `start.bat` recompila automaticamente.
 * **Design System:** Tema PlayStation Dark Nebula com CSS3 moderno, glassmorphism e animações fluidas.
 
 ---

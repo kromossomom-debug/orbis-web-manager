@@ -214,6 +214,58 @@ namespace OrbisWebManager
             });
         }
 
+        /// <summary>Reads only [offset, offset+count) of a file (e.g. a PKG header) and aborts the
+        /// transfer. The connection is retired afterwards because servers differ in how they
+        /// report an aborted RETR.</summary>
+        public byte[] RetrieveRange(string path, long offset, int count)
+        {
+            var buf = new byte[count];
+            int got = 0;
+            try
+            {
+                if (offset > 0) Expect(Cmd("REST " + offset), 350);
+                using (var data = OpenPassive())
+                {
+                    var pre = Cmd("RETR " + path);
+                    if (pre.Code != 150 && pre.Code != 125) throw new FtpException(pre.Code, pre.Text);
+                    using (var ds = data.GetStream())
+                    {
+                        int n;
+                        while (got < count && (n = ds.Read(buf, got, count - got)) > 0) got += n;
+                    }
+                }
+            }
+            finally
+            {
+                Broken = true;
+            }
+            if (got < count) Array.Resize(ref buf, got);
+            return buf;
+        }
+
+        /// <summary>Resumes an upload: the caller passes the size already on the console as
+        /// <paramref name="offset"/> and the rest of the file, which is appended (APPE).
+        /// REST+STOR isn't used because the GoldHEN server doesn't reliably honour REST.</summary>
+        public void StoreAt(string path, Stream source, long offset, Action<long> progress)
+        {
+            if (offset <= 0) { Store(path, source, progress); return; }
+            long have = Size(path);
+            if (have != offset) throw new FtpException(451, "O arquivo no PS4 tem " + have + " bytes, esperado " + offset + ".");
+            DataCommand("APPE " + path, ds =>
+            {
+                byte[] buf = new byte[256 * 1024];
+                int read;
+                long total = offset;
+                while ((read = source.Read(buf, 0, buf.Length)) > 0)
+                {
+                    ds.Write(buf, 0, read);
+                    total += read;
+                    if (progress != null) progress(total);
+                }
+                ds.Flush();
+            });
+        }
+
         public byte[] RetrieveBytes(string path)
         {
             using (var ms = new MemoryStream())

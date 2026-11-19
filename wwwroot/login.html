@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#0b0d12">
+  <title>Orbis Web Manager • PIN</title>
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="apple-touch-icon" href="/icons/icon-192.png">
+  <link rel="stylesheet" href="/css/style.css">
+  <style>
+    body { display: grid; place-items: center; min-height: 100vh; padding: 16px; background: var(--bg); }
+    .login { width: 100%; max-width: 360px; padding: 32px; text-align: center; }
+    .login img { width: 64px; height: 64px; border-radius: 16px; margin-bottom: 16px; }
+    .login h1 { font-size: 20px; margin-bottom: 4px; }
+    .login p { font-size: 14px; color: var(--text-3); margin-bottom: 24px; }
+    .login input { width: 100%; text-align: center; font-size: 28px; letter-spacing: .4em; font-family: var(--mono); padding: 12px; }
+    .login button { width: 100%; margin-top: 16px; justify-content: center; }
+    .login .err { color: var(--danger); min-height: 20px; margin-top: 12px; font-size: 14px; }
+  </style>
+</head>
+<body>
+  <form class="card login" id="f">
+    <img src="/icons/icon-192.png" alt="">
+    <h1>Orbis Web Manager</h1>
+    <p>Digite o PIN definido no PC para continuar.</p>
+    <label class="sr-only" for="pin">PIN</label>
+    <input id="pin" type="password" inputmode="numeric" pattern="\d*" maxlength="8" autocomplete="current-password" autofocus required>
+    <button class="btn btn-primary" type="submit">Entrar</button>
+    <div class="err" id="err" role="alert"></div>
+  </form>
+  <script>
+    document.getElementById('f').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const err = document.getElementById('err');
+      err.textContent = '';
+      try {
+        const r = await fetch('/api/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pin: document.getElementById('pin').value }) });
+        if (r.ok) { location.href = '/'; return; }
+        const d = await r.json().catch(() => ({}));
+        err.textContent = d.error || 'PIN incorreto.';
+      } catch (x) { err.textContent = 'O Orbis não respondeu. O programa está aberto no PC?'; }
+    });
+  </script>
+</body>
+</html>

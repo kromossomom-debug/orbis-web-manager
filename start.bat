@@ -4,12 +4,15 @@ title Orbis Web Manager - PlayStation 4 Suite
 
 cd /d "%~dp0"
 
-rem Always rebuild so the .exe matches the source code (takes ~2 seconds)
-call "%~dp0build.bat"
-if %ERRORLEVEL% neq 0 (
-    echo [ERRO] Falha ao compilar.
-    pause
-    exit /b 1
+rem Rebuild from the source when it is here, so the .exe always matches the code (~2 s).
+rem The release .zip already ships a compiled OrbisManager.exe, so a failed build is not fatal.
+if exist "%~dp0src\Program.cs" (
+    call "%~dp0build.bat"
+    if errorlevel 1 if not exist "%~dp0OrbisManager.exe" (
+        echo [ERRO] Falha ao compilar.
+        pause
+        exit /b 1
+    )
 )
 
 echo.

@@ -9,6 +9,11 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
   <link rel="stylesheet" href="/css/style.css">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="apple-touch-icon" href="/icons/icon-192.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Orbis">
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><rect width='24' height='24' rx='6' fill='%233b8bff'/><path d='M6 15.5l3-7h1.6l3 7M7.2 13h4.8M15.5 8.5v7M15.5 8.5h1.7a2 2 0 010 4h-1.7' stroke='white' stroke-width='1.6' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>">
 </head>
 <body>
@@ -45,6 +50,14 @@
       <symbol id="i-more" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="19" cy="12" r="1.7"/></symbol>
       <symbol id="i-qr" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3M21 14v.01M17 21h4v-4M14 21v-3"/></symbol>
       <symbol id="i-copy" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></symbol>
+      <symbol id="i-chart" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></symbol>
+      <symbol id="i-sliders" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"/></symbol>
+      <symbol id="i-pause" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M8 5v14M16 5v14"/></symbol>
+      <symbol id="i-x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+      <symbol id="i-trash" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/></symbol>
+      <symbol id="i-trophy" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 01-10 0zM17 5h3v2a3 3 0 01-3 3M7 5H4v2a3 3 0 003 3"/></symbol>
+      <symbol id="i-lock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 018 0v4"/></symbol>
+      <symbol id="i-clock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
       <symbol id="i-star" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M12 2l3.1 6.3 6.9 1-5 4.9 1.2 6.8L12 17.8 5.8 21l1.2-6.8-5-4.9 6.9-1z"/></symbol>
     </defs>
   </svg>
@@ -75,11 +88,17 @@
         <button class="nav-item" data-tab="media">
           <svg><use href="#i-image"/></svg><span data-i18n="nav_media">Capturas & Prints</span>
         </button>
+        <button class="nav-item" data-tab="stats">
+          <svg><use href="#i-chart"/></svg><span>Estatísticas</span>
+        </button>
 
         <div class="nav-group-label">Console</div>
         <button class="nav-item" data-tab="downloads">
           <svg><use href="#i-download"/></svg><span data-i18n="nav_downloads">Downloads</span>
           <span class="nav-badge" id="downloads-count-badge" hidden>0</span>
+        </button>
+        <button class="nav-item" data-tab="saves">
+          <svg><use href="#i-save"/></svg><span>Saves (backup)</span>
         </button>
         <button class="nav-item" data-tab="files">
           <svg><use href="#i-folder"/></svg><span data-i18n="nav_files">Arquivos (FTP)</span>
@@ -94,6 +113,9 @@
         </button>
 
         <div class="nav-group-label">Ferramentas</div>
+        <button class="nav-item" data-tab="goldhen">
+          <svg><use href="#i-sliders"/></svg><span>GoldHEN</span>
+        </button>
         <button class="nav-item" data-tab="tools">
           <svg><use href="#i-tool"/></svg><span data-i18n="nav_tools">Payloads & Ações</span>
         </button>
@@ -164,6 +186,21 @@
             </div>
             <button class="btn btn-outline btn-sm" id="btn-banner-retry"><svg><use href="#i-refresh"/></svg>Tentar de novo</button>
             <button class="btn btn-primary btn-sm" data-tab-trigger="settings">Abrir Configurações</button>
+          </div>
+
+          <div class="info-box app-update-box" id="app-update-box" hidden>
+            <strong>Nova versão do Orbis disponível: <span id="app-update-ver"></span></strong>
+            <a class="btn btn-primary btn-sm" id="app-update-link" href="#" target="_blank" rel="noopener">Baixar no GitHub</a>
+          </div>
+
+          <!-- Now playing -->
+          <div class="card now-playing" id="now-playing" hidden>
+            <img id="np-icon" alt="" data-icon>
+            <div class="grow">
+              <span class="np-label"><span class="live-dot"></span>Jogando agora</span>
+              <strong id="np-name">—</strong>
+              <span class="np-sub" id="np-sub"></span>
+            </div>
           </div>
 
           <!-- 1. Console status strip -->
@@ -274,6 +311,17 @@
           <div class="recent-games-slider" id="dash-recent-games">
             <div class="loading-state"><div class="spinner"></div><span>Carregando biblioteca…</span></div>
           </div>
+
+          <!-- 5. Activity -->
+          <div class="card panel mt-4">
+            <div class="panel-head">
+              <div>
+                <h3>Atividade recente</h3>
+                <p>O que foi feito pelo Orbis</p>
+              </div>
+            </div>
+            <ul class="activity-list" id="activity-list"><li class="text-muted text-sm">Nada ainda.</li></ul>
+          </div>
         </section>
 
         <!-- ============ GAMES ============ -->
@@ -295,8 +343,18 @@
               <button class="btn btn-outline" id="btn-refresh-games" title="Shift+clique: atualização completa (relê nomes e capas)">
                 <svg><use href="#i-refresh"/></svg><span>Atualizar</span>
               </button>
+              <button class="btn btn-outline" id="btn-check-updates" title="Compara a versão instalada com a mais recente da PSN">
+                <svg><use href="#i-download"/></svg><span>Atualizações</span>
+              </button>
+              <button class="btn btn-outline" id="btn-batch-covers" title="Trocar a capa de vários jogos de uma vez">
+                <svg><use href="#i-image"/></svg><span>Capas em lote</span>
+              </button>
+              <a class="btn btn-outline" href="/api/export/library.csv" title="Baixa a biblioteca como planilha (Excel / Google Planilhas)">
+                <svg><use href="#i-save"/></svg><span>Exportar</span>
+              </a>
             </div>
           </div>
+          <div class="info-box updates-box" id="updates-box" hidden></div>
           <div class="list-status" id="games-status" aria-live="polite"></div>
           <div class="games-grid" id="games-container"></div>
         </section>
@@ -366,6 +424,10 @@
               </div>
               <button class="btn btn-primary" id="btn-upload-pkg-direct"><svg><use href="#i-upload"/></svg><span>Enviar PKG</span></button>
             </div>
+            <div class="info-box pkg-analyze-box" id="pkg-analyze-box">
+              <span>Descubra quais PKGs já foram instalados e só estão ocupando espaço.</span>
+              <button class="btn btn-outline btn-sm" id="btn-analyze-pkgs"><svg><use href="#i-search"/></svg><span>Analisar PKGs</span></button>
+            </div>
             <div class="pkg-grid" id="pkgs-container"></div>
           </div>
 
@@ -403,6 +465,125 @@
           </div>
         </section>
 
+        <!-- ============ SAVES ============ -->
+        <section class="tab-pane" id="pane-saves">
+          <div class="card p-4">
+            <div class="pkg-header-banner">
+              <div>
+                <h2>Backup de saves</h2>
+                <p>Copia os saves de cada jogo para o PC. Restaurar funciona no <strong>mesmo console e mesmo usuário</strong>. Feche o jogo antes de restaurar.</p>
+              </div>
+              <div class="row">
+                <label class="sr-only" for="saves-user">Usuário</label>
+                <select id="saves-user" class="select-sm"></select>
+                <button class="btn btn-primary" id="btn-backup-all"><svg><use href="#i-save"/></svg><span>Backup de todos</span></button>
+                <button class="btn btn-outline" id="btn-open-saves-folder" title="Abre a pasta dos backups no PC"><svg><use href="#i-folder"/></svg><span>Pasta</span></button>
+              </div>
+            </div>
+            <div class="list-status" id="saves-status" aria-live="polite"></div>
+            <div class="saves-list" id="saves-container"></div>
+          </div>
+        </section>
+
+        <!-- ============ STATS ============ -->
+        <section class="tab-pane" id="pane-stats">
+          <div class="card p-4">
+            <div class="pkg-header-banner">
+              <div>
+                <h2>Tempo de jogo por dia</h2>
+                <p id="history-sub">O GoldHEN só guarda o total de cada jogo; o Orbis registra o total todo dia para montar este gráfico.</p>
+              </div>
+              <select id="history-span" class="select-sm" aria-label="Período">
+                <option value="7">7 dias</option>
+                <option value="14" selected>14 dias</option>
+                <option value="30">30 dias</option>
+                <option value="90">90 dias</option>
+              </select>
+            </div>
+            <div class="history-chart" id="history-chart"></div>
+            <div class="history-top" id="history-top"></div>
+          </div>
+
+          <div class="card p-4 mt-4">
+            <div class="pkg-header-banner">
+              <div>
+                <h2>Espaço ocupado por jogo</h2>
+                <p>Jogo base, atualizações e DLCs instalados no HD do PS4.</p>
+              </div>
+              <button class="btn btn-outline" id="btn-scan-storage"><svg><use href="#i-refresh"/></svg><span>Calcular</span></button>
+            </div>
+            <div class="list-status" id="storage-status" aria-live="polite"></div>
+            <div class="storage-list" id="storage-container"></div>
+          </div>
+
+          <div class="card p-4 mt-4">
+            <div class="pkg-header-banner">
+              <div>
+                <h2>Troféus</h2>
+                <p>Progresso de troféus de cada jogo, lido do próprio console.</p>
+              </div>
+              <button class="btn btn-outline" id="btn-load-trophies"><svg><use href="#i-trophy"/></svg><span>Carregar</span></button>
+            </div>
+            <div class="trophy-list" id="trophies-container"></div>
+          </div>
+        </section>
+
+        <!-- ============ GOLDHEN ============ -->
+        <section class="tab-pane" id="pane-goldhen">
+          <div class="subtabs" role="tablist" aria-label="Seções do GoldHEN">
+            <button class="subtab active" role="tab" data-sub="gh-config" aria-selected="true">Configurações</button>
+            <button class="subtab" role="tab" data-sub="gh-plugins" aria-selected="false">Plugins</button>
+            <button class="subtab" role="tab" data-sub="gh-patches" aria-selected="false">Patches de jogo</button>
+            <button class="subtab" role="tab" data-sub="gh-cheats" aria-selected="false">Cheats online</button>
+          </div>
+
+          <div class="card p-4 subpane active" id="gh-config">
+            <div class="pkg-header-banner">
+              <div>
+                <h2>Configurações do GoldHEN</h2>
+                <p>O mesmo que o menu do GoldHEN, sem precisar abrir no console. Vale depois de reiniciar o PS4. Uma cópia do arquivo antigo fica guardada no PC.</p>
+              </div>
+              <button class="btn btn-primary" id="btn-save-ghconfig" disabled><svg><use href="#i-save"/></svg><span>Salvar no PS4</span></button>
+            </div>
+            <div id="ghconfig-container"></div>
+          </div>
+
+          <div class="card p-4 subpane" id="gh-plugins">
+            <div class="pkg-header-banner">
+              <div>
+                <h2>Plugins</h2>
+                <p>Plugins em <code>/data/GoldHEN/plugins/</code>. "Todos os jogos" carrega em qualquer jogo; também dá para ligar um plugin só em um jogo.</p>
+              </div>
+              <button class="btn btn-primary" id="btn-save-plugins" disabled><svg><use href="#i-save"/></svg><span>Salvar no PS4</span></button>
+            </div>
+            <div id="plugins-container"></div>
+          </div>
+
+          <div class="card p-4 subpane" id="gh-patches">
+            <div class="pkg-header-banner">
+              <div>
+                <h2>Patches de jogo</h2>
+                <p>Patches da comunidade (60 FPS, resolução, correções) do repositório oficial do GoldHEN, só para os jogos que você tem. Depois de instalar, ative cada patch no menu do GoldHEN dentro do jogo.</p>
+              </div>
+              <button class="btn btn-outline" id="btn-refresh-patches"><svg><use href="#i-refresh"/></svg><span>Atualizar lista</span></button>
+            </div>
+            <div class="list-status" id="patches-status"></div>
+            <div id="patches-container"></div>
+          </div>
+
+          <div class="card p-4 subpane" id="gh-cheats">
+            <div class="pkg-header-banner">
+              <div>
+                <h2>Cheats online</h2>
+                <p>Cheats do repositório oficial do GoldHEN para os seus jogos. Use o da mesma versão do jogo instalado.</p>
+              </div>
+              <button class="btn btn-outline" id="btn-refresh-cheatrepo"><svg><use href="#i-refresh"/></svg><span>Atualizar lista</span></button>
+            </div>
+            <div class="list-status" id="cheatrepo-status"></div>
+            <div id="cheatrepo-container"></div>
+          </div>
+        </section>
+
         <!-- ============ CAPTURES ============ -->
         <section class="tab-pane" id="pane-media">
           <div class="section-header">
@@ -410,7 +591,11 @@
               <h3>Capturas de tela</h3>
               <p>Prints tirados com o botão Share, por jogo</p>
             </div>
-            <button class="btn btn-outline" id="btn-refresh-captures"><svg><use href="#i-refresh"/></svg><span>Atualizar</span></button>
+            <div class="row">
+              <button class="btn btn-outline" id="btn-select-captures"><svg><use href="#i-plus"/></svg><span>Selecionar</span></button>
+              <button class="btn btn-primary" id="btn-zip-captures" hidden><svg><use href="#i-download"/></svg><span>Baixar .zip (<span id="zip-count">0</span>)</span></button>
+              <button class="btn btn-outline" id="btn-refresh-captures"><svg><use href="#i-refresh"/></svg><span>Atualizar</span></button>
+            </div>
           </div>
           <div class="captures-game-selector" id="captures-game-selector" role="tablist" aria-label="Jogos com capturas"></div>
           <div class="captures-grid" id="captures-container"></div>
@@ -586,6 +771,45 @@
                 <button type="submit" class="btn btn-primary"><svg><use href="#i-save"/></svg><span data-i18n="settings_save">Salvar</span></button>
               </div>
             </form>
+
+            <div class="settings-extra">
+              <div class="card settings-card">
+                <h3><svg class="inline-ico"><use href="#i-clock"/></svg>Limite de tempo de jogo</h3>
+                <p class="text-sm mb-3">Um aviso aparece na TV depois de um tempo jogando ou a partir de um horário. Precisa do ps4debug carregado e do Orbis aberto no PC.</p>
+                <div class="form-row">
+                  <div class="form-group col">
+                    <label for="pl-minutes">Avisar depois de (minutos)</label>
+                    <input type="number" id="pl-minutes" min="0" max="1440" placeholder="0 = sem limite">
+                  </div>
+                  <div class="form-group col">
+                    <label for="pl-curfew">Avisar a partir de</label>
+                    <input type="time" id="pl-curfew">
+                  </div>
+                </div>
+                <div class="form-actions"><button class="btn btn-outline" id="btn-save-playlimit"><svg><use href="#i-save"/></svg><span>Salvar limite</span></button></div>
+              </div>
+
+              <div class="card settings-card">
+                <h3><svg class="inline-ico"><use href="#i-lock"/></svg>PIN de acesso pela rede</h3>
+                <p class="text-sm mb-3" id="pin-state">Sem PIN: qualquer aparelho no seu Wi-Fi abre o Orbis. No próprio PC nunca é pedido.</p>
+                <div class="form-row">
+                  <div class="form-group col">
+                    <label for="pin-input">Novo PIN (4 a 8 números)</label>
+                    <input type="password" id="pin-input" inputmode="numeric" pattern="\d*" maxlength="8" autocomplete="new-password">
+                  </div>
+                </div>
+                <div class="form-actions">
+                  <button class="btn btn-outline" id="btn-save-pin"><svg><use href="#i-lock"/></svg><span>Definir PIN</span></button>
+                  <button class="btn btn-ghost" id="btn-clear-pin" hidden>Remover PIN</button>
+                </div>
+              </div>
+
+              <div class="card settings-card">
+                <h3>Sobre</h3>
+                <p class="text-sm">Orbis Web Manager <strong id="about-version">—</strong> <span id="about-update"></span></p>
+                <p class="text-sm mt-2"><a class="link" href="https://github.com/kromossomom-debug/orbis-web-manager/releases" target="_blank" rel="noopener">Versões no GitHub</a></p>
+              </div>
+            </div>
 
             <aside class="card settings-help">
               <h3>Primeiros passos</h3>
@@ -773,6 +997,7 @@
           <button class="btn btn-ghost btn-sm" id="gd-btn-files"><svg><use href="#i-folder"/></svg>Abrir pasta</button>
         </div>
         <div id="gd-cheats" class="mt-3"></div>
+        <div id="gd-extra" class="gd-extra"></div>
       </div>
     </div>
   </div>
@@ -869,6 +1094,54 @@
   <input type="file" id="cheat-file-input" accept=".json" hidden>
   <input type="file" id="cover-file-input" accept="image/png, image/jpeg" hidden>
 
+  <!-- Batch covers -->
+  <div class="modal-overlay" id="modal-batch-covers" role="dialog" aria-modal="true" aria-labelledby="batch-title">
+    <div class="modal-card modal-lg" tabindex="-1">
+      <div class="modal-header">
+        <h3 id="batch-title">Trocar capas em lote</h3>
+        <button class="modal-close" aria-label="Fechar">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p class="modal-desc">Escolha os jogos e de onde vem a arte. As capas originais ficam guardadas e podem ser restauradas jogo a jogo.</p>
+        <div class="form-row mt-3">
+          <div class="form-group col">
+            <label for="batch-source">Fonte da arte</label>
+            <select id="batch-source">
+              <option value="sony">Arte oficial da PlayStation Store</option>
+              <option value="sgdb">SteamGridDB (primeira capa quadrada)</option>
+              <option value="auto">Oficial, e SteamGridDB se não houver</option>
+            </select>
+          </div>
+          <div class="form-group col batch-select-btns">
+            <label>Seleção</label>
+            <div class="row">
+              <button class="btn btn-ghost btn-sm" id="batch-all">Todos</button>
+              <button class="btn btn-ghost btn-sm" id="batch-none">Nenhum</button>
+              <button class="btn btn-ghost btn-sm" id="batch-nocustom">Sem capa personalizada</button>
+            </div>
+          </div>
+        </div>
+        <div class="batch-grid" id="batch-grid"></div>
+        <div id="batch-progress" class="mt-3"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" data-close>Cancelar</button>
+        <button class="btn btn-primary" id="batch-start"><svg><use href="#i-image"/></svg><span>Trocar <span id="batch-count">0</span> capas</span></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Command palette (Ctrl+K) -->
+  <div class="modal-overlay palette-overlay" id="modal-palette" role="dialog" aria-modal="true" aria-label="Busca global">
+    <div class="modal-card palette" tabindex="-1">
+      <label class="palette-input">
+        <svg><use href="#i-search"/></svg>
+        <input type="search" id="palette-input" placeholder="Buscar jogo, tela ou ação… (Ctrl+K)" autocomplete="off">
+      </label>
+      <ul class="palette-results" id="palette-results" role="listbox"></ul>
+    </div>
+  </div>
+
   <div class="toast-container" id="toast-container" aria-live="polite" aria-atomic="false"></div>
 
   <!-- Tutorial -->
@@ -888,5 +1161,6 @@
   </div>
 
   <script src="/js/app.js"></script>
+  <script src="/js/features.js"></script>
 </body>
 </html>

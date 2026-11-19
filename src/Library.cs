@@ -311,7 +311,21 @@ namespace OrbisWebManager
                 DateTime updated = final ? DateTime.UtcNow : (snapshot != null ? snapshot.updated : DateTime.MinValue);
                 snapshot = new LibrarySnapshot { games = games, updated = updated };
             }
-            if (final) Save();
+            if (final)
+            {
+                Save();
+                try { History.Record(games); } catch { }
+            }
+        }
+
+        public static bool IsInstalled(string id)
+        {
+            lock (Sync) return snapshot != null && snapshot.games != null && snapshot.games.Exists(g => string.Equals(g.id, id, StringComparison.OrdinalIgnoreCase));
+        }
+
+        public static List<GameItem> Games()
+        {
+            lock (Sync) return snapshot != null && snapshot.games != null ? new List<GameItem>(snapshot.games) : new List<GameItem>();
         }
 
         static string MaxDate(List<FtpItem> items)

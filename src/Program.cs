@@ -21,6 +21,10 @@ namespace OrbisWebManager
         public string active_user { get; set; }
         public string steamgriddb_api_key { get; set; }
         public string pc_pkg_folder { get; set; }
+        public int playlimit_minutes { get; set; }
+        public string playlimit_curfew { get; set; }
+        public string access_pin_hash { get; set; }
+        public string auth_secret { get; set; }
 
         public static Config Load(string path)
         {
@@ -39,6 +43,14 @@ namespace OrbisWebManager
             if (cfg.active_user == null) cfg.active_user = "";
             if (cfg.steamgriddb_api_key == null) cfg.steamgriddb_api_key = "";
             if (cfg.pc_pkg_folder == null) cfg.pc_pkg_folder = "";
+            if (cfg.playlimit_curfew == null) cfg.playlimit_curfew = "";
+            if (cfg.access_pin_hash == null) cfg.access_pin_hash = "";
+            if (string.IsNullOrEmpty(cfg.auth_secret))
+            {
+                var b = new byte[32];
+                using (var rng = RandomNumberGenerator.Create()) rng.GetBytes(b);
+                cfg.auth_secret = Convert.ToBase64String(b);
+            }
             cfg.Save(path);
             return cfg;
         }
@@ -51,7 +63,7 @@ namespace OrbisWebManager
 
     class Program
     {
-        public const string AppVersion = "2.0";
+        public const string AppVersion = "2.2";
         public static Config Settings;
         public static string AppDir, CacheDir, CapturesDir, WwwDir, ConfigPath;
         public static bool LanAccess;
@@ -108,6 +120,7 @@ namespace OrbisWebManager
             ThreadPool.QueueUserWorkItem(_ => { try { Library.Refresh(); } catch { } });
             ThreadPool.QueueUserWorkItem(_ => { try { Summary.Get(false); } catch { } });
 
+            NowPlaying.StartWatcher();
             StartHttpServer();
         }
 
@@ -189,6 +202,7 @@ namespace OrbisWebManager
             string path = ctx.Request.Url.AbsolutePath;
             try
             {
+                if (!Auth.Allow(ctx)) return;
                 if (path.StartsWith("/api/")) Api.Handle(ctx);
                 else if (path.StartsWith("/pcpkg/")) Api.ServePcPkg(ctx);
                 else ServeStatic(ctx, path);
@@ -228,6 +242,7 @@ namespace OrbisWebManager
                 case ".jpg": case ".jpeg": type = "image/jpeg"; break;
                 case ".svg": type = "image/svg+xml"; break;
                 case ".ico": type = "image/x-icon"; break;
+                case ".webmanifest": type = "application/manifest+json"; break;
             }
             ctx.Response.Headers["Cache-Control"] = "no-cache";
             Http.Bytes(ctx.Response, File.ReadAllBytes(local), type);
@@ -326,6 +341,8 @@ namespace OrbisWebManager
                 }
             }
 
+            if (Features.Handle(ctx, path, q, post)) return;
+
             switch (path)
             {
                 // ------------------------------------------------ status / dashboard
@@ -388,6 +405,7 @@ namespace OrbisWebManager
                         string target = Http.Str(d, "target");
                         Covers.Apply(id, img, target == "background" ? "background" : "icon", Http.Str(d, "fit") == "contain" ? "contain" : "cover");
                         Library.MarkCoverChanged(id);
+                        Activity.Add("cover", (target == "background" ? "Fundo trocado: " : "Capa trocada: ") + Library.TitleOf(id));
                         Http.Json(res, new { success = true, iconUrl = Library.IconUrl(id) });
                         return;
                     }
@@ -399,6 +417,7 @@ namespace OrbisWebManager
                         bool ok = Covers.Restore(id, Http.Str(d, "target") == "background" ? "background" : "icon");
                         Library.MarkCoverChanged(id);
                         if (!ok) { Http.Error(res, 404, "Nenhum backup da arte original encontrado para " + id + "."); return; }
+                        Activity.Add("cover", "Arte original restaurada: " + Library.TitleOf(id));
                         Http.Json(res, new { success = true, iconUrl = Library.IconUrl(id) });
                         return;
                     }
@@ -439,8 +458,11 @@ namespace OrbisWebManager
                         string name = q["filename"] ?? "";
                         if (name.Length == 0 || name.IndexOfAny(new[] { '/', '\\' }) >= 0) { Http.Error(res, 400, "Nome de arquivo inválido."); return; }
                         string remote = dir + name;
-                        Ftp.RunOnce("Enviando " + name, c => c.Store(remote, req.InputStream, null));
+                        long offset;
+                        long.TryParse(q["offset"], out offset);
+                        Ftp.RunOnce("Enviando " + name, c => c.StoreAt(remote, req.InputStream, offset, null));
                         Summary.Invalidate();
+                        if (offset == 0 && name.EndsWith(".pkg", StringComparison.OrdinalIgnoreCase)) Activity.Add("pkg", "PKG enviado ao PS4: " + name);
                         Http.Json(res, new { success = true, path = remote });
                         return;
                     }
@@ -552,6 +574,7 @@ namespace OrbisWebManager
                         try
                         {
                             Ps4Services.SendPayload(payload);
+                            Activity.Add("payload", "Payload enviado (" + (payload.Length / 1024) + " KB)");
                             Http.Json(res, new { success = true, message = "Payload enviado (" + payload.Length + " bytes) para a porta " + Program.Settings.payload_port + "." });
                         }
                         catch (Exception ex) { Http.Error(res, 502, ex.Message); }
@@ -566,6 +589,7 @@ namespace OrbisWebManager
                         try
                         {
                             Ps4Services.Notify(msg);
+                            Activity.Add("notify", "Notificação enviada à TV: " + (msg.Length > 60 ? msg.Substring(0, 60) + "…" : msg));
                             Http.Json(res, new { success = true });
                         }
                         catch (Exception ex)
@@ -603,6 +627,7 @@ namespace OrbisWebManager
                             string r = Ps4Services.RpiCall("install", new { type = "direct", packages = new[] { url } });
                             var parsed = new JavaScriptSerializer().DeserializeObject(r) as Dictionary<string, object>;
                             bool ok = parsed != null && parsed.ContainsKey("status") && Convert.ToString(parsed["status"]) == "success";
+                            if (ok) Activity.Add("pkg", "Instalação pela rede iniciada: " + (file.Length > 0 ? file : url));
                             Http.Json(res, new
                             {
                                 success = ok,
@@ -703,7 +728,8 @@ namespace OrbisWebManager
 
             long ping = Ps4Services.Ping(700);
             bool? ftp = Ftp.TryPing(1500);
-            bool ftpOk = ftp != false; // null == busy, which means it is up
+            // null == busy: up if the console answers ping, otherwise it's probably stuck connecting to an offline PS4
+            bool ftpOk = ftp == true || (ftp == null && ping >= 0);
             string banner = Ftp.LastBanner ?? "";
             string hen = "GoldHEN";
             var m = Regex.Match(banner, @"GoldHEN[^\r\n]*?v?(\d+(\.\d+)+\w*)", RegexOptions.IgnoreCase);
@@ -970,7 +996,17 @@ namespace OrbisWebManager
             if (!string.IsNullOrEmpty(folder) && Directory.Exists(folder))
             {
                 foreach (var f in new DirectoryInfo(folder).GetFiles("*.pkg"))
-                    list.Add(new { name = f.Name, size = f.Length, date = f.LastWriteTime.ToString("dd/MM/yyyy HH:mm") });
+                {
+                    var info = Pkg.InfoLocalCached(f.FullName);
+                    string note;
+                    string status = Pkg.Status(info, out note);
+                    list.Add(new
+                    {
+                        name = f.Name, size = f.Length, date = f.LastWriteTime.ToString("dd/MM/yyyy HH:mm"),
+                        title = info.title, titleId = info.titleId, version = info.version, kind = info.kind,
+                        contentId = info.contentId, hasIcon = info.hasIcon, status = status, note = note
+                    });
+                }
             }
             Http.Json(res, new
             {

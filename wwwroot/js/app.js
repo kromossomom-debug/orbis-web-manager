@@ -278,6 +278,7 @@ async function api(url, opts = {}) {
     const res = await fetch(url, { ...opts, signal: ctrl.signal });
     const ct = res.headers.get('content-type') || '';
     const data = ct.includes('json') ? await res.json() : null;
+    if (res.status === 401) { location.href = '/login.html'; throw new Error('PIN necessário.'); }
     if (!res.ok) throw new Error((data && data.error) || `Erro HTTP ${res.status}`);
     return data;
   } catch (e) {
@@ -487,6 +488,9 @@ function updateTabTitles(tabId) {
     cheats: { title: d.title_cheats, sub: d.sub_cheats },
     pkgs: { title: d.title_pkgs, sub: d.sub_pkgs },
     downloads: { title: d.title_downloads, sub: d.sub_downloads },
+    saves: { title: 'Saves', sub: 'Backup e restauração dos saves de cada jogo' },
+    stats: { title: 'Estatísticas', sub: 'Tempo de jogo, espaço em disco e troféus' },
+    goldhen: { title: 'GoldHEN', sub: 'Configurações, plugins, patches e cheats online' },
     media: { title: d.title_media, sub: d.sub_media },
     tools: { title: d.title_tools, sub: d.sub_tools },
     settings: { title: d.title_settings, sub: d.sub_settings },
@@ -518,6 +522,7 @@ function switchTab(tabId) {
   if (tabId === 'settings') loadConfig();
   if (tabId === 'tools') checkBinLoader();
   if (tabId === 'downloads') loadDownloads();
+  if (typeof onFeatureTab === 'function') onFeatureTab(tabId);
 }
 
 // ================= DELEGATED ACTIONS (dynamic lists) =================
@@ -1424,17 +1429,7 @@ function processUploadQueue() {
   percentText.textContent = '0%';
   openModal('modal-upload');
 
-  const xhr = new XMLHttpRequest();
-  xhr.open('POST', `/api/files/upload?path=${encodeURIComponent(targetDir)}&filename=${encodeURIComponent(file.name)}`, true);
-  const started = Date.now();
-  xhr.upload.onprogress = (e) => {
-    if (!e.lengthComputable) return;
-    const pct = Math.round((e.loaded / e.total) * 100);
-    const secs = (Date.now() - started) / 1000;
-    const speed = secs > 0 ? e.loaded / secs : 0;
-    progressFill.style.width = `${pct}%`;
-    percentText.textContent = `${pct}% (${formatBytes(e.loaded)} / ${formatBytes(e.total)})${speed ? ` • ${formatBytes(speed)}/s` : ''}`;
-  };
+  const remotePath = targetDir.replace(/\/?$/, '/') + file.name;
   const finish = (ok, msg) => {
     if (ok) {
       progressFill.style.width = '100%';
@@ -1454,13 +1449,42 @@ function processUploadQueue() {
       processUploadQueue();
     }, ok ? 800 : 200);
   };
-  xhr.onload = () => {
-    let msg = xhr.statusText;
-    try { const d = JSON.parse(xhr.responseText); if (d.error) msg = d.error; } catch (e) { }
-    finish(xhr.status === 200, msg);
+  // Big files over Wi-Fi: if the transfer breaks, ask how much reached the PS4 and continue from there.
+  const sendFrom = (offset, attempt) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', `/api/files/upload?path=${encodeURIComponent(targetDir)}&filename=${encodeURIComponent(file.name)}&offset=${offset}`, true);
+    const started = Date.now();
+    xhr.upload.onprogress = (e) => {
+      if (!e.lengthComputable) return;
+      const done = offset + e.loaded;
+      const pct = Math.round((done / file.size) * 100);
+      const secs = (Date.now() - started) / 1000;
+      const speed = secs > 0 ? e.loaded / secs : 0;
+      progressFill.style.width = `${pct}%`;
+      percentText.textContent = `${pct}% (${formatBytes(done)} / ${formatBytes(file.size)})${speed ? ` • ${formatBytes(speed)}/s` : ''}${attempt ? ` • retomado (${attempt})` : ''}`;
+    };
+    const retry = async (msg) => {
+      if (attempt >= 5 || file.size < 8 * 1024 * 1024) return finish(false, msg);
+      percentText.textContent = `Conexão caiu, retomando… (${attempt + 1}/5)`;
+      await new Promise(r => setTimeout(r, 3000));
+      try {
+        const s = await api(`/api/files/size?path=${encodeURIComponent(remotePath)}`, { timeout: 20000 });
+        if (s.size > 0 && s.size < file.size) return sendFrom(s.size, attempt + 1);
+        if (s.size === file.size) return finish(true);
+      } catch (e) { }
+      sendFrom(offset, attempt + 1);
+    };
+    xhr.onload = () => {
+      let msg = xhr.statusText;
+      try { const d = JSON.parse(xhr.responseText); if (d.error) msg = d.error; } catch (e) { }
+      if (xhr.status === 200) finish(true);
+      else if (xhr.status >= 500) retry(msg);
+      else finish(false, msg);
+    };
+    xhr.onerror = () => retry('conexão interrompida');
+    xhr.send(offset > 0 ? file.slice(offset) : file);
   };
-  xhr.onerror = () => finish(false, 'conexão interrompida');
-  xhr.send(file);
+  sendFrom(0, 0);
 }
 
 // ================= DRAG AND DROP =================

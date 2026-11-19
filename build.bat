@@ -11,7 +11,7 @@ if not exist "%CSC_PATH%" (
     exit /b 1
 )
 
-"%CSC_PATH%" /nologo /optimize+ /r:System.Web.Extensions.dll /r:System.Drawing.dll /out:"%~dp0OrbisManager.exe" "%~dp0src\*.cs"
+"%CSC_PATH%" /nologo /optimize+ /r:System.Web.Extensions.dll /r:System.Drawing.dll /r:System.IO.Compression.dll /r:System.IO.Compression.FileSystem.dll /r:System.Xml.dll /out:"%~dp0OrbisManager.exe" "%~dp0src\*.cs"
 
 if %ERRORLEVEL% equ 0 (
     echo [+] Compilacao concluida: %~dp0OrbisManager.exe

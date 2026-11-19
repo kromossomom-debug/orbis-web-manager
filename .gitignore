@@ -10,3 +10,6 @@ obj/
 .idea/
 .vscode/
 Thumbs.db
+backups/
+dist/
+promo-video/
