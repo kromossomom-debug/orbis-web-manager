@@ -491,6 +491,7 @@ function updateTabTitles(tabId) {
     saves: { title: 'Saves', sub: 'Backup e restauração dos saves de cada jogo' },
     stats: { title: 'Estatísticas', sub: 'Tempo de jogo, espaço em disco e troféus' },
     goldhen: { title: 'GoldHEN', sub: 'Configurações, plugins, patches e cheats online' },
+    themes: { title: 'Temas', sub: 'Crie e instale temas para a tela inicial do PS4' },
     media: { title: d.title_media, sub: d.sub_media },
     tools: { title: d.title_tools, sub: d.sub_tools },
     settings: { title: d.title_settings, sub: d.sub_settings },

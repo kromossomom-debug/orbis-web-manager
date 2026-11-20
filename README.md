@@ -132,6 +132,14 @@ Ele se conecta diretamente ao seu **PlayStation 4** através da rede local (Wi-F
 ### 🔐 PIN de acesso pela rede
 * Opcional: celulares e outros aparelhos pedem um PIN (lembrado por 30 dias). No próprio PC nunca é pedido.
 
+### 🎨 Temas para o PS4
+* Repositório local de temas (pasta `themes/`): crie um tema, escolha as imagens (fundo da tela inicial, área de funções e logo) e as cores, e o Orbis gera tudo o que o PS4 pede (`theme.xml`, `param.sfo`, ícones de função e de conteúdo, prévia) e monta o `.pkg` com o [LibOrbisPkg](https://github.com/maxton/LibOrbisPkg) (LGPL-3.0, em `tools/pkgtool/`).
+* **Enviar ao PS4** gera o pacote de novo se algo mudou e o coloca em `/data/pkg/`; apague a versão anterior em *Configurações › Temas*, instale em *Debug Settings › Package Installer* e aplique.
+* **Simulação no PS4:** a prévia mostra a tela inicial com os seus jogos por cima, para conferir se os jogos cobrem o que importa. Opções para descer a arte (o céu é estendido), tratamento de cor e posição do logo.
+* **Música da tela inicial:** envie um `.at9` (ATRAC9, **48 kHz, estéreo, 144 kbps**: em 168 kbps o PS4 não toca). O Orbis adiciona o loop e o `bgmhome_loud` que os temas da Sony têm. Para converter o WAV use o ATRACTool (que usa o at9tool da Sony; não incluído).
+* O Orbis corrige dois pontos que o LibOrbisPkg não faz para temas: marca o pacote como tema do sistema (`IRO_TAG = 2`, senão ele instala como DLC e não aparece em Temas) e refaz as assinaturas.
+* A pasta `themes/` fica fora do Git: use imagens com direitos autorais só nos seus temas pessoais.
+
 ### ⚡ E também
 * **Busca global (Ctrl+K ou /):** encontra jogo, tela ou ação.
 * **Capas em lote:** troca a capa de vários jogos de uma vez com a arte oficial ou do SteamGridDB.

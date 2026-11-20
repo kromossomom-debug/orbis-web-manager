@@ -9,6 +9,7 @@ function onFeatureTab(tab) {
   if (tab === 'goldhen') loadGoldhenSub(document.querySelector('#pane-goldhen .subtab.active').dataset.sub);
   if (tab === 'dashboard') { loadActivity(); loadNowPlaying(); }
   if (tab === 'settings') loadSettingsExtra();
+  if (tab === 'themes') loadThemes();
   if (tab !== 'media' && fx.selectCaptures) toggleCaptureSelect(false);
 }
 
@@ -34,7 +35,7 @@ async function downloadPost(url, body, fallbackName) {
 }
 
 // ======================================================= DASHBOARD: activity, now playing, app update
-const ACT_ICONS = { save: '#i-save', cover: '#i-image', pkg: '#i-package', notify: '#i-bell', payload: '#i-bolt', goldhen: '#i-sliders', cheat: '#i-bolt', download: '#i-download', uninstall: '#i-trash', limit: '#i-clock', auth: '#i-lock', capture: '#i-image' };
+const ACT_ICONS = { save: '#i-save', cover: '#i-image', pkg: '#i-package', notify: '#i-bell', payload: '#i-bolt', goldhen: '#i-sliders', cheat: '#i-bolt', download: '#i-download', uninstall: '#i-trash', limit: '#i-clock', auth: '#i-lock', capture: '#i-image', theme: '#i-image' };
 
 async function loadActivity() {
   const box = document.getElementById('activity-list');
@@ -760,7 +761,7 @@ async function savePin(clear) {
 const PALETTE_PAGES = [
   ['dashboard', 'Dashboard', '#i-home'], ['games', 'Jogos & Apps', '#i-games'], ['media', 'Capturas', '#i-image'], ['stats', 'Estatísticas', '#i-chart'],
   ['downloads', 'Downloads', '#i-download'], ['saves', 'Saves (backup)', '#i-save'], ['files', 'Arquivos (FTP)', '#i-folder'], ['pkgs', 'Pacotes (PKG)', '#i-package'],
-  ['cheats', 'Cheats & Mods', '#i-bolt'], ['goldhen', 'GoldHEN', '#i-sliders'], ['tools', 'Payloads & Ações', '#i-tool'], ['settings', 'Configurações', '#i-settings']
+  ['cheats', 'Cheats & Mods', '#i-bolt'], ['goldhen', 'GoldHEN', '#i-sliders'], ['themes', 'Temas do PS4', '#i-image'], ['tools', 'Payloads & Ações', '#i-tool'], ['settings', 'Configurações', '#i-settings']
 ];
 const PALETTE_ACTIONS = [
   ['Enviar PKG para o PS4', '#i-upload', () => document.getElementById('pkg-file-input').click()],

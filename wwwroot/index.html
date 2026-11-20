@@ -116,6 +116,9 @@
         <button class="nav-item" data-tab="goldhen">
           <svg><use href="#i-sliders"/></svg><span>GoldHEN</span>
         </button>
+        <button class="nav-item" data-tab="themes">
+          <svg><use href="#i-image"/></svg><span>Temas</span>
+        </button>
         <button class="nav-item" data-tab="tools">
           <svg><use href="#i-tool"/></svg><span data-i18n="nav_tools">Payloads & Ações</span>
         </button>
@@ -582,6 +585,79 @@
             <div class="list-status" id="cheatrepo-status"></div>
             <div id="cheatrepo-container"></div>
           </div>
+        </section>
+
+        <!-- ============ THEMES ============ -->
+        <section class="tab-pane" id="pane-themes">
+          <div class="card p-4">
+            <div class="pkg-header-banner">
+              <div>
+                <h2>Seus temas</h2>
+                <p>Crie temas para a tela inicial do PS4: escolha as imagens e as cores, gere o <code>.pkg</code> e envie. No PS4, instale em <strong>Debug Settings › Package Installer</strong> e ative em <strong>Configurações › Temas</strong>.</p>
+              </div>
+              <div class="row">
+                <input type="text" id="theme-new-name" class="input-sm" placeholder="Nome do novo tema" maxlength="60">
+                <button class="btn btn-primary" id="btn-theme-create"><svg><use href="#i-plus"/></svg><span>Criar tema</span></button>
+              </div>
+            </div>
+            <div class="list-status" id="themes-status"></div>
+            <div class="theme-grid" id="themes-container"></div>
+          </div>
+
+          <div class="card p-4 mt-4" id="theme-editor" hidden>
+            <div class="pkg-header-banner">
+              <div>
+                <h2 id="te-title">Editar tema</h2>
+                <p id="te-sub"></p>
+              </div>
+              <div class="row">
+                <button class="btn btn-outline" id="te-build"><svg><use href="#i-package"/></svg><span>Gerar .pkg</span></button>
+                <button class="btn btn-primary" id="te-send"><svg><use href="#i-send"/></svg><span>Enviar ao PS4</span></button>
+                <a class="btn btn-ghost" id="te-download" href="#"><svg><use href="#i-download"/></svg><span>Baixar .pkg</span></a>
+              </div>
+            </div>
+            <div class="te-layout">
+              <div>
+                <div class="subtabs te-views" role="tablist" aria-label="Prévia">
+                  <button class="subtab active" data-te-view="mock">Simulação no PS4</button>
+                  <button class="subtab" data-te-view="functions">Área de funções</button>
+                  <button class="subtab" data-te-view="preview">Prévia do tema</button>
+                </div>
+                <img class="te-preview" id="te-preview" alt="Prévia do tema">
+                <div class="te-note" id="te-note"></div>
+              </div>
+              <div class="te-form">
+                <div class="form-group"><label for="te-name">Nome</label><input type="text" id="te-name" maxlength="60"></div>
+                <div class="te-slots" id="te-slots"></div>
+                <div class="te-slot">
+                  <div class="grow"><strong>Música da tela inicial (opcional)</strong>
+                    <small id="te-bgm-state">Arquivo .at9 (ATRAC9). Converta o áudio com o ATRACTool: WAV 48 kHz estéreo → AT9. Toca só na tela inicial e para quando um jogo abre.</small>
+                  </div>
+                  <div class="row">
+                    <button class="btn btn-ghost btn-sm" id="te-bgm-remove" hidden>Remover</button>
+                    <button class="btn btn-outline btn-sm" id="te-bgm-upload"><svg><use href="#i-upload"/></svg>Enviar .at9</button>
+                  </div>
+                </div>
+                <div class="form-row">
+                  <div class="form-group col"><label for="te-accent">Cor principal</label><input type="color" id="te-accent"></div>
+                  <div class="form-group col"><label for="te-accent2">Cor do degradê</label><input type="color" id="te-accent2"></div>
+                  <div class="form-group col"><label for="te-font">Cor do texto</label><input type="color" id="te-font"></div>
+                </div>
+                <div class="form-group"><label for="te-dim">Escurecer o topo, atrás dos jogos (<span id="te-dim-val"></span>%)</label><input type="range" id="te-dim" min="0" max="80"></div>
+                <div class="form-group"><label for="te-shift">Descer a arte (<span id="te-shift-val"></span>%): os rostos ficam abaixo da fileira de jogos e o céu é estendido</label><input type="range" id="te-shift" min="0" max="50"></div>
+                <div class="form-group"><label for="te-grade">Tratamento de cor e vinheta (<span id="te-grade-val"></span>%)</label><input type="range" id="te-grade" min="0" max="100"></div>
+                <div class="form-row">
+                  <label class="te-personal col"><input type="checkbox" id="te-logo"> Logo na tela inicial</label>
+                  <div class="form-group col"><label for="te-logopos" class="sr-only">Posição do logo</label>
+                    <select id="te-logopos" class="select-sm"><option value="bl">Canto inferior esquerdo</option><option value="br">Canto inferior direito</option></select></div>
+                </div>
+                <label class="te-personal"><input type="checkbox" id="te-personal"> Usa imagens com direitos autorais (só para uso pessoal, não compartilhar)</label>
+                <div class="form-actions"><button class="btn btn-outline" id="te-save"><svg><use href="#i-save"/></svg><span>Salvar alterações</span></button><button class="btn btn-ghost" id="te-delete"><svg><use href="#i-trash"/></svg><span>Apagar tema</span></button></div>
+              </div>
+            </div>
+          </div>
+          <input type="file" id="theme-file-input" accept="image/png,image/jpeg" hidden>
+          <input type="file" id="theme-bgm-input" accept=".at9" hidden>
         </section>
 
         <!-- ============ CAPTURES ============ -->
@@ -1162,5 +1238,6 @@
 
   <script src="/js/app.js"></script>
   <script src="/js/features.js"></script>
+  <script src="/js/themes.js"></script>
 </body>
 </html>

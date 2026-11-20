@@ -478,6 +478,78 @@ namespace OrbisWebManager
                         return true;
                     }
 
+                // ---------------------------------------------------- PS4 themes (local repository + builder)
+                case "/api/themes": Run(res, () => Themes.List()); return true;
+                case "/api/themes/get": Run(res, () => Themes.Load(q["id"]), 404); return true;
+                case "/api/themes/create":
+                    if (!post) return false;
+                    Run(res, () => Themes.Create(Http.Str(Http.ReadJson(req), "name")), 400);
+                    return true;
+                case "/api/themes/update":
+                    if (!post) return false;
+                    {
+                        var d = Http.ReadJson(req);
+                        Run(res, () => { Themes.Update(q["id"], d); return new { success = true }; }, 400);
+                        return true;
+                    }
+                case "/api/themes/upload":
+                    if (!post) return false;
+                    {
+                        byte[] img = Http.ReadBody(req, 32 * 1024 * 1024);
+                        Run(res, () => new { success = true, file = Themes.AddSource(q["id"], img, q["slot"]) }, 400);
+                        return true;
+                    }
+                case "/api/themes/source":
+                    {
+                        byte[] b = null;
+                        try { b = Themes.SourceImage(q["id"], q["file"]); } catch { }
+                        if (b == null) { res.StatusCode = 404; res.Close(); return true; }
+                        res.Headers["Cache-Control"] = "public, max-age=3600";
+                        Http.Bytes(res, b, Covers.SniffImageType(b));
+                        return true;
+                    }
+                case "/api/themes/preview":
+                    {
+                        byte[] b = null;
+                        try { b = Themes.Preview(q["id"]); } catch { }
+                        if (b == null) { res.StatusCode = 404; res.Close(); return true; }
+                        res.Headers["Cache-Control"] = "no-cache";
+                        Http.Bytes(res, b, "image/png");
+                        return true;
+                    }
+                case "/api/themes/mock":
+                    {
+                        byte[] b;
+                        try { b = Themes.MockPng(q["id"], q["screen"]); }
+                        catch (Exception ex) { Http.Error(res, 404, ex.Message); return true; }
+                        res.Headers["Cache-Control"] = "no-cache";
+                        Http.Bytes(res, b, "image/png");
+                        return true;
+                    }
+                case "/api/themes/build":
+                    if (!post) return false;
+                    Run(res, () => Themes.Build(q["id"]), 500);
+                    return true;
+                case "/api/themes/send":
+                    if (!post) return false;
+                    Run(res, () => Themes.Send(q["id"]));
+                    return true;
+                case "/api/themes/pkg":
+                    {
+                        string pkg = null;
+                        try { pkg = Themes.BuiltPkg(q["id"]); } catch { }
+                        if (pkg == null) { Http.Error(res, 404, "Gere o .pkg primeiro."); return true; }
+                        res.ContentType = "application/octet-stream";
+                        res.Headers["Content-Disposition"] = Http.ContentDisposition(Path.GetFileName(pkg));
+                        using (var fs = File.OpenRead(pkg)) { res.ContentLength64 = fs.Length; fs.CopyTo(res.OutputStream); }
+                        res.Close();
+                        return true;
+                    }
+                case "/api/themes/delete":
+                    if (!post) return false;
+                    Run(res, () => { Themes.Delete(q["id"]); return new { success = true }; }, 400);
+                    return true;
+
                 // ---------------------------------------------------- play-time limit settings
                 case "/api/playlimit":
                     if (post)
